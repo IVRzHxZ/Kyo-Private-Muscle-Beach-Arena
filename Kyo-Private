@@ -181,6 +181,21 @@ end)
 -- Visually toggle the switch to green and activate the code logic immediately
 AntiAFKSwitch:Set(true)
 
+local loopActive = false
+
+FarmTab:AddSwitch("FAKE fast rep", function(state)
+    loopActive = state
+    
+    -- Runs a continuous loop while the switch is toggled ON
+    task.spawn(function()
+        while loopActive do
+            local Event = game:GetService("ReplicatedStorage").EffectsGUi
+            firesignal(Event.OnClientEvent, "Strength", 1000000000)
+            task.wait(0.1) -- Adjustable delay to prevent game crashes
+        end
+    end)
+end)
+
 -- Global Environment Setup
 getgenv().AutoFarmAll = false
 
