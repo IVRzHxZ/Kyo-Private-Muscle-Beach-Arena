@@ -3367,38 +3367,6 @@ game:GetService("UserInputService").JumpRequest:Connect(function()
     end
 end)
 
-local LockEnabled = false
-local LockedCFrame = nil
-
-misc:AddSwitch("Lock Position", function(Value)
-    LockEnabled = Value
-    local char = game.Players.LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    if LockEnabled then
-        if hrp then
-            -- Save current position and anchor
-            LockedCFrame = hrp.CFrame
-            hrp.Anchored = true
-            
-            -- Optional: Loop to ensure you don't drift
-            task.spawn(function()
-                while LockEnabled and hrp do
-                    hrp.CFrame = LockedCFrame
-                    hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
-                    task.wait()
-                end
-            end)
-        end
-    else
-        -- Unlock position
-        if hrp then
-            hrp.Anchored = false
-        end
-    end
-end)
-
 local fps1 = Tab:AddFolder("Misc V2")
 
 	fps1:AddButton('Remove Textures', function()
