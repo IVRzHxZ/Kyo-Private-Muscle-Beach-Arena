@@ -1973,23 +1973,15 @@ local ClockLabel = TrackerTab:AddLabel("Session Time: 00:00:00")
 
 local startTime = os.time() 
 
-task.spawn(function()
-    while task.wait(1) do
-        local elapsedSeconds = math.max(os.time() - startTime, 1)
-        
-        local hours = math.floor(elapsedSeconds / 3600)
-        local minutes = math.floor((elapsedSeconds % 3600) / 60)
-        local seconds = elapsedSeconds % 60
-        
-        ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
-    end
-end)
-
 local myStatNames = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"}
 local My_UI_Labels = {}
 local startingStats = {}
 local cachedObjects = {} 
 local liveConnections = {} 
+
+-- Persistent Session Trackers to handle Rebirths / Resets
+local totalGainedSession = {} 
+local lastKnownValues = {}    
 
 local function updateLabelText(name, content)
     local label = My_UI_Labels[name]
@@ -2049,19 +2041,34 @@ local function scanForStatFast(statName)
     return nil
 end
 
--- Hyper-Optimized Display Writer (Handles Rebirths/Stat Resets)
+-- Hyper-Optimized Display Writer (Handles Rebirths/Stat Resets Safely)
 local function computeAndRenderStat(name, currentVal)
     local startVal = startingStats[name]
     
-    -- FIX: If current stat is lower than start stat, player reborn or spent points.
-    -- We reset the baseline to the current value so calculations don't go negative.
-    if not startVal or currentVal < startVal then
+    if not startVal then
+        startingStats[name] = currentVal
+        startVal = currentVal
+        totalGainedSession[name] = 0
+        lastKnownValues[name] = currentVal
+    end
+    
+    if not totalGainedSession[name] then totalGainedSession[name] = 0 end
+    if not lastKnownValues[name] then lastKnownValues[name] = currentVal end
+
+    -- REBIRTH DETECTED: If current value dropped below the last known value
+    if currentVal < lastKnownValues[name] then
+        local progressBeforeReset = math.max(lastKnownValues[name] - startVal, 0)
+        totalGainedSession[name] = totalGainedSession[name] + progressBeforeReset
+        
         startingStats[name] = currentVal
         startVal = currentVal
     end
     
+    lastKnownValues[name] = currentVal
+
+    local currentGain = math.max(currentVal - startVal, 0)
+    local gained = totalGainedSession[name] + currentGain
     local elapsedSeconds = math.max(os.time() - startTime, 1)
-    local gained = currentVal - startVal
     local formattedCurrent = formatNumber(currentVal)
     
     if gained > 0 then
@@ -2080,6 +2087,8 @@ end
 local function bindObjectSignals(name, obj)
     cachedObjects[name] = obj
     startingStats[name] = tonumber(obj.Value) or 0
+    lastKnownValues[name] = tonumber(obj.Value) or 0
+    totalGainedSession[name] = totalGainedSession[name] or 0
     
     if liveConnections[name] then
         pcall(function() liveConnections[name]:Disconnect() end)
@@ -2103,6 +2112,7 @@ for i = 1, #myStatNames do
     if foundObj then
         local initialVal = tonumber(foundObj.Value) or 0
         startingStats[name] = initialVal
+        lastKnownValues[name] = initialVal
         currentText = string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formatNumber(initialVal))
     end
     
@@ -2112,6 +2122,28 @@ for i = 1, #myStatNames do
         bindObjectSignals(name, foundObj)
     end
 end
+
+-- FIXED: Combined Clock and Stats Loop to instantly compute calculations every 1 second
+task.spawn(function()
+    while task.wait(1) do
+        local elapsedSeconds = math.max(os.time() - startTime, 1)
+        
+        -- Update Clock Label
+        local hours = math.floor(elapsedSeconds / 3600)
+        local minutes = math.floor((elapsedSeconds % 3600) / 60)
+        local seconds = elapsedSeconds % 60
+        ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
+        
+        -- Force recalculation for all tracked stats instantly every second
+        for i = 1, #myStatNames do
+            local name = myStatNames[i]
+            local obj = cachedObjects[name]
+            if obj then
+                computeAndRenderStat(name, tonumber(obj.Value) or 0)
+            end
+        end
+    end
+end)
 
 -- Lightweight background handler to catch instances that load late
 LocalPlayer.ChildAdded:Connect(function(child)
@@ -2206,7 +2238,11 @@ local SpyTab = window:AddTab("Spy Stats Player 👁️")
 local targetPlayer = nil 
 local spyStatNames = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"}
 local Spy_UI_Labels = {}
+
+-- Persistent Trackers for the Spy Target Player
 local targetBaselineStats = {} 
+local spyTotalGainedSession = {}
+local spyLastKnownValues = {}
 local spyStartTime = os.time() 
 
 -- 1. Create Dropdown Object with custom Reset logic
@@ -2214,12 +2250,18 @@ local PlayerDropdown = SpyTab:AddDropdown("Select Player...", function(selectedN
     if selectedName == "None" or selectedName == "" then
         targetPlayer = nil
         targetBaselineStats = {}
+        spyTotalGainedSession = {}
+        spyLastKnownValues = {}
         return
     end
 
     local foundPlayer = Players:FindFirstChild(selectedName)
     if foundPlayer then
+        -- Clear history and reset buffers completely for the new selected target
         targetBaselineStats = {}
+        spyTotalGainedSession = {}
+        spyLastKnownValues = {}
+        
         targetPlayer = foundPlayer
         spyStartTime = os.time() -- Reset clock baseline immediately for newly selected player
         
@@ -2227,9 +2269,14 @@ local PlayerDropdown = SpyTab:AddDropdown("Select Player...", function(selectedN
         for _, name in ipairs(spyStatNames) do
             local statObj = locatePlayerStatObject(targetPlayer, name)
             if statObj and (statObj:IsA("ValueBase") or statObj.ClassName:find("Value")) then
-                targetBaselineStats[name] = tonumber(statObj.Value) or 0
+                local val = tonumber(statObj.Value) or 0
+                targetBaselineStats[name] = val
+                spyLastKnownValues[name] = val
+                spyTotalGainedSession[name] = 0
             else
                 targetBaselineStats[name] = 0
+                spyLastKnownValues[name] = 0
+                spyTotalGainedSession[name] = 0
             end
         end
     else
@@ -2253,7 +2300,16 @@ end
 
 refreshDropdownOptions()
 Players.PlayerAdded:Connect(refreshDropdownOptions)
-Players.PlayerRemoving:Connect(refreshDropdownOptions)
+Players.PlayerRemoving:Connect(function(player)
+    -- If the player currently being spied on leaves, clear the target safely
+    if targetPlayer == player then
+        targetPlayer = nil
+        targetBaselineStats = {}
+        spyTotalGainedSession = {}
+        spyLastKnownValues = {}
+    end
+    refreshDropdownOptions()
+end)
 
 -- Construct full projection display fields for the Spy Tab
 for _, name in ipairs(spyStatNames) do
@@ -2273,14 +2329,34 @@ task.spawn(function()
                 if uiElement then
                     if statObj and (statObj:IsA("ValueBase") or statObj.ClassName:find("Value")) then
                         local currentVal = tonumber(statObj.Value) or 0
-                        local startVal = targetBaselineStats[name] or currentVal
+                        local startVal = targetBaselineStats[name]
                         
-                        if startVal == 0 and targetBaselineStats[name] == 0 then
+                        -- Lazy initialization helper if baseline wasn't bound properly
+                        if not startVal then
+                            targetBaselineStats[name] = currentVal
+                            startVal = currentVal
+                            spyLastKnownValues[name] = currentVal
+                            spyTotalGainedSession[name] = 0
+                        end
+                        
+                        if not spyTotalGainedSession[name] then spyTotalGainedSession[name] = 0 end
+                        if not spyLastKnownValues[name] then spyLastKnownValues[name] = currentVal end
+
+                        -- REBIRTH DETECTED FOR SPY TARGET: Current value is less than last known value
+                        if currentVal < spyLastKnownValues[name] then
+                            local progressBeforeReset = math.max(spyLastKnownValues[name] - startVal, 0)
+                            spyTotalGainedSession[name] = spyTotalGainedSession[name] + progressBeforeReset
+                            
                             targetBaselineStats[name] = currentVal
                             startVal = currentVal
                         end
                         
-                        local gained = currentVal - startVal
+                        spyLastKnownValues[name] = currentVal
+
+                        -- Calculate absolute total gained session data points
+                        local currentGain = math.max(currentVal - startVal, 0)
+                        local gained = spyTotalGainedSession[name] + currentGain
+                        
                         local formattedCurrent = formatNumber(currentVal)
                         local sign = gained >= 0 and "+" or ""
                         
