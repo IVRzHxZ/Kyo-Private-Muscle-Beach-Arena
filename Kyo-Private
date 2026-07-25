@@ -2991,7 +2991,7 @@ workspace.DescendantAdded:Connect(function(descendant)
     end
 end)
 
-misc:AddButton("Load Fly GUI V3", function()
+misc:AddButton("Fly GUI V3", function()
     -- This executes the external Fly GUI script when the button is clicked
     loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
 end)
