@@ -2708,7 +2708,7 @@ misc:AddButton("Stats Changer", function()
     loadstring(game:HttpGet("https://pastebin.com/raw/Lrjy9D3B"))()
 end)
 
-misc:AddButton("Load Hand Master R15", function()
+misc:AddButton("Hand Master R15", function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Hand-Master-r15-Anim-Edited-Becoming-Puncher-By-Leorio-208942"))()
 end)
 
@@ -2780,7 +2780,7 @@ misc:AddButton("Rejoin Server", function()
     rejoinServer()
 end)
 
-misc:AddButton("Load Emotes Script", function()
+misc:AddButton("Emotes", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"))()
 end)
 
