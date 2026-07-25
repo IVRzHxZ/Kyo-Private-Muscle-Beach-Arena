@@ -1979,9 +1979,11 @@ local startingStats = {}
 local cachedObjects = {} 
 local liveConnections = {} 
 
--- Persistent Session Trackers to handle Rebirths / Resets
+-- Persistent Trackers
 local totalGainedSession = {} 
 local lastKnownValues = {}    
+local statRatesPerSecond = {} -- Dito na i-se-save ang real-time speed ng farm mo
+local lastUpdateTimes = {}
 
 local function updateLabelText(name, content)
     local label = My_UI_Labels[name]
@@ -2001,12 +2003,11 @@ local function formatNumber(value)
     return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. suffix
 end
 
--- Optimized Fast Static Scanner (Scans only once, eliminates search loops)
+-- Optimized Fast Static Scanner
 local function scanForStatFast(statName)
     if not LocalPlayer then return nil end
     local lowerTarget = string.lower(statName)
     
-    -- Check fastest typical hubs first without loops where possible
     local classicHubs = {"leaderstats", "leaderstats2", "Stats", "PlayerData", "Data", "Currency"}
     for i = 1, #classicHubs do
         local folder = LocalPlayer:FindFirstChild(classicHubs[i])
@@ -2021,7 +2022,6 @@ local function scanForStatFast(statName)
         end
     end
 
-    -- Direct fallback root children scan
     local rootChildren = LocalPlayer:GetChildren()
     for i = 1, #rootChildren do
         local child = rootChildren[i]
@@ -2041,8 +2041,9 @@ local function scanForStatFast(statName)
     return nil
 end
 
--- Hyper-Optimized Display Writer (Handles Rebirths/Stat Resets Safely)
+-- Hyper-Optimized Display Writer (No more gained / elapsedSeconds!)
 local function computeAndRenderStat(name, currentVal)
+    local currentTime = os.time()
     local startVal = startingStats[name]
     
     if not startVal then
@@ -2050,12 +2051,16 @@ local function computeAndRenderStat(name, currentVal)
         startVal = currentVal
         totalGainedSession[name] = 0
         lastKnownValues[name] = currentVal
+        lastUpdateTimes[name] = currentTime
+        statRatesPerSecond[name] = 0
     end
     
     if not totalGainedSession[name] then totalGainedSession[name] = 0 end
     if not lastKnownValues[name] then lastKnownValues[name] = currentVal end
+    if not lastUpdateTimes[name] then lastUpdateTimes[name] = currentTime end
+    if not statRatesPerSecond[name] then statRatesPerSecond[name] = 0 end
 
-    -- REBIRTH DETECTED: If current value dropped below the last known value
+    -- REBIRTH DETECTED: Handles stat resets cleanly
     if currentVal < lastKnownValues[name] then
         local progressBeforeReset = math.max(lastKnownValues[name] - startVal, 0)
         totalGainedSession[name] = totalGainedSession[name] + progressBeforeReset
@@ -2063,23 +2068,38 @@ local function computeAndRenderStat(name, currentVal)
         startingStats[name] = currentVal
         startVal = currentVal
     end
+
+    -- DELTA REAL-TIME RATE CALCULATION
+    local diff = currentVal - lastKnownValues[name]
+    if diff > 0 then
+        local timePassed = math.max(currentTime - lastUpdateTimes[name], 1)
+        statRatesPerSecond[name] = diff / timePassed
+        lastUpdateTimes[name] = currentTime
+    end
     
     lastKnownValues[name] = currentVal
 
     local currentGain = math.max(currentVal - startVal, 0)
     local gained = totalGainedSession[name] + currentGain
-    local elapsedSeconds = math.max(os.time() - startTime, 1)
     local formattedCurrent = formatNumber(currentVal)
     
-    if gained > 0 then
-        local perSecond = gained / elapsedSeconds
+    -- Real-time rate scaling based on actual tick increments
+    local activeRate = statRatesPerSecond[name]
+    
+    if gained > 0 and activeRate > 0 then
+        local perMinute = activeRate * 60
+        local perHour   = activeRate * 3600
+        local perDay    = activeRate * 86400
+        local perWeek   = activeRate * 604800
+
         updateLabelText(name, string.format(
             "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
             name, formattedCurrent, formatNumber(gained),
-            formatNumber(perSecond * 60), formatNumber(perSecond * 3600), formatNumber(perSecond * 86400), formatNumber(perSecond * 604800)
+            formatNumber(perMinute), formatNumber(perHour), formatNumber(perDay), formatNumber(perWeek)
         ))
     else
-        updateLabelText(name, string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formattedCurrent))
+        -- Kapag nakatigil ang farm, ipapakita lang ang kasalukuyang total gained nang hindi nag-zi-zero ang text format
+        updateLabelText(name, string.format("%s: %s (+%s) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formattedCurrent, formatNumber(gained)))
     end
 end
 
@@ -2089,6 +2109,8 @@ local function bindObjectSignals(name, obj)
     startingStats[name] = tonumber(obj.Value) or 0
     lastKnownValues[name] = tonumber(obj.Value) or 0
     totalGainedSession[name] = totalGainedSession[name] or 0
+    lastUpdateTimes[name] = os.time()
+    statRatesPerSecond[name] = 0
     
     if liveConnections[name] then
         pcall(function() liveConnections[name]:Disconnect() end)
@@ -2123,10 +2145,11 @@ for i = 1, #myStatNames do
     end
 end
 
--- FIXED: Combined Clock and Stats Loop to instantly compute calculations every 1 second
+-- Combined Clock and Decay Loop
 task.spawn(function()
     while task.wait(1) do
         local elapsedSeconds = math.max(os.time() - startTime, 1)
+        local currentTime = os.time()
         
         -- Update Clock Label
         local hours = math.floor(elapsedSeconds / 3600)
@@ -2134,11 +2157,18 @@ task.spawn(function()
         local seconds = elapsedSeconds % 60
         ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
         
-        -- Force recalculation for all tracked stats instantly every second
+        -- Force recalculation and apply decay if player stops training
         for i = 1, #myStatNames do
             local name = myStatNames[i]
             local obj = cachedObjects[name]
             if obj then
+                -- DECAY LOGIC: Kung lampas 4 segundo nang walang pumapasok na stat, unti-unting ibaba ang display rate
+                local lastActive = lastUpdateTimes[name] or currentTime
+                if currentTime - lastActive > 4 then
+                    statRatesPerSecond[name] = math.max((statRatesPerSecond[name] or 0) * 0.7, 0)
+                    if statRatesPerSecond[name] < 0.1 then statRatesPerSecond[name] = 0 end
+                end
+                
                 computeAndRenderStat(name, tonumber(obj.Value) or 0)
             end
         end
@@ -2148,7 +2178,7 @@ end)
 -- Lightweight background handler to catch instances that load late
 LocalPlayer.ChildAdded:Connect(function(child)
     if child:IsA("Folder") or child:IsA("Configuration") then
-        task.wait(0.5) -- Tiny safety gap for late server initialization
+        task.wait(0.5)
         for i = 1, #myStatNames do
             local name = myStatNames[i]
             if not cachedObjects[name] then
