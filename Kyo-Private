@@ -2700,6 +2700,248 @@ Tab:AddButton("Clear Whitelist", function()
     print("[WHITELIST] Whitelist cleared completely.")
 end)
 
+Tab:AddLabel("Auto Kill V2")
+
+-- 3. Core Operational Data Layers (Tables)
+local whitelistTable = {} 
+local blacklistTable = {} 
+
+_G.autokillall = false
+_G.autokilltarget = false
+_G.AutoPunchActive = false 
+_G.SingleTargetName = ""
+_G.WhitelistInputText = "" 
+_G.FriendsWhitelistActive = false
+
+-- The Loop-Active Tool Function requested
+local function runContinuousToolLogic(localPlayer)
+    local char = localPlayer.Character
+    if not char then return end
+
+    -- Tool Verification & Auto-Equipping Logic
+    local tool = char:FindFirstChild("Punch")
+    if not tool then
+        local backpack = localPlayer:FindFirstChild("Backpack")
+        if backpack then
+            local bpTool = backpack:FindFirstChild("Punch")
+            if bpTool then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum:EquipTool(bpTool)
+                end
+            end
+        end
+    end
+
+    -- Tool Activation
+    local activeTool = char:FindFirstChild("Punch")
+    if activeTool then
+        activeTool:Activate()
+    end
+end
+
+-- Separate Hitbox and Remote Execution Handler
+local function executeAttack(targetPlayer, localPlayer, localLeftHand)
+    if targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") and localLeftHand then
+        local targetHead = targetPlayer.Character.Head
+        
+        pcall(function()
+            firetouchinterest(targetHead, localLeftHand, 0)
+            task.wait(0.01)
+            firetouchinterest(targetHead, localLeftHand, 1)
+        end)
+        
+        pcall(function()
+            localPlayer.muscleEvent:FireServer("punch", "leftHand")
+            localPlayer.muscleEvent:FireServer("punch", "rightHand")
+        end)
+    end
+end
+
+-- Helper validation function for 'Kill All'
+local function isPlayerWhitelisted(targetName, localPlayer)
+    if targetName == localPlayer.Name then return true end
+    
+    for _, whitelistedName in ipairs(whitelistTable) do
+        if targetName == whitelistedName then return true end
+    end
+    
+    for _, blacklistedName in ipairs(blacklistTable) do
+        if targetName == blacklistedName then return false end
+    end
+    
+    return false
+end
+
+-- Helper function to check and safely add a friend to the whitelist table
+local function checkAndWhitelistFriend(player, localPlayer)
+    if player == localPlayer then return end
+    local isFriend = false
+    pcall(function()
+        isFriend = localPlayer:IsFriendsWithAsync(player.UserId)
+    end)
+    if isFriend then
+        if not table.find(whitelistTable, player.Name) then
+            table.insert(whitelistTable, player.Name)
+        end
+    end
+end
+
+-- 5. FUNCTION A: Auto Kill All Switch
+Tab:AddSwitch('Auto Kill All', function(state)
+    _G.autokillall = state
+    
+    if state then
+        -- Thread 1: Continuous Fast Tool Punch Loop
+        task.spawn(function()
+            while _G.autokillall do
+                local localPlayer = game:GetService("Players").LocalPlayer
+                if localPlayer then
+                    runContinuousToolLogic(localPlayer)
+                end
+                task.wait() -- Fires loop at maximum engine speeds
+            end
+        end)
+
+        -- Thread 2: Target Scanner / Hitbox Loop
+        task.spawn(function()
+            while _G.autokillall do
+                local players = game:GetService("Players"):GetPlayers()
+                local localPlayer = game:GetService("Players").LocalPlayer
+                
+                if not localPlayer or not localPlayer.Character then 
+                    task.wait() 
+                    continue 
+                end
+                
+                local localLeftHand = localPlayer.Character:FindFirstChild("LeftHand")
+                
+                for _, player in ipairs(players) do
+                    if not _G.autokillall then break end
+                    if not isPlayerWhitelisted(player.Name, localPlayer) then
+                        executeAttack(player, localPlayer, localLeftHand)
+                    end
+                end
+                
+                game:GetService('RunService').RenderStepped:Wait()
+            end
+        end)
+    end
+end)
+
+-- 6. FUNCTION B: Auto Kill Target Switch
+Tab:AddSwitch('Auto Kill Target', function(state)
+    _G.autokilltarget = state
+    
+    if state then
+        -- Thread 1: Continuous Fast Tool Punch Loop
+        task.spawn(function()
+            while _G.autokilltarget do
+                local localPlayer = game:GetService("Players").LocalPlayer
+                if localPlayer then
+                    runContinuousToolLogic(localPlayer)
+                end
+                task.wait()
+            end
+        end)
+
+        -- Thread 2: Target Scanner / Hitbox Loop
+        task.spawn(function()
+            while _G.autokilltarget do
+                local players = game:GetService("Players"):GetPlayers()
+                local localPlayer = game:GetService("Players").LocalPlayer
+                
+                if not localPlayer or not localPlayer.Character then 
+                    task.wait() 
+                    continue 
+                end
+                
+                local localLeftHand = localPlayer.Character:FindFirstChild("LeftHand")
+                
+                for _, player in ipairs(players) do
+                    if not _G.autokilltarget then break end
+                    
+                    if _G.SingleTargetName ~= "" then
+                        local searchString = _G.SingleTargetName:lower()
+                        local usernameMatch = player.Name:lower():find(searchString)
+                        local nicknameMatch = player.DisplayName:lower():find(searchString)
+                        
+                        if usernameMatch or nicknameMatch then
+                            executeAttack(player, localPlayer, localLeftHand)
+                        end
+                    end
+                end
+                
+                game:GetService('RunService').RenderStepped:Wait()
+            end
+        end)
+    end
+end)
+
+-- 4. Target Input Selection Component (Accepts Username or Nickname)
+Tab:AddTextBox("Singel Auto Kill", function(text)
+    _G.SingleTargetName = text
+end)
+
+-- 8. Whitelist Textbox
+Tab:AddTextBox("Type Player Name To Whitelist", function(text)
+    _G.WhitelistInputText = text
+end)
+
+-- 9. Whitelist Confirmation Button
+Tab:AddButton("Add to Whitelist", function()
+    local text = _G.WhitelistInputText
+    if text == "" then return end
+    
+    local searchString = text:lower()
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        local usernameMatch = player.Name:lower():find(searchString)
+        local nicknameMatch = player.DisplayName:lower():find(searchString)
+        
+        if usernameMatch or nicknameMatch then
+            if not table.find(whitelistTable, player.Name) then
+                table.insert(whitelistTable, player.Name)
+            end
+        end
+    end
+end)
+
+-- 10. Clear Whitelist Button
+Tab:AddButton("Clear Whitelist", function()
+    table.clear(whitelistTable)
+end)
+
+-- 11. Friend Filtering Management Switch
+Tab:AddSwitch('Whitelist Friends', function(state)
+    local localPlayer = game:GetService("Players").LocalPlayer
+    if not localPlayer then return end
+    
+    _G.FriendsWhitelistActive = state
+    if state then
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            checkAndWhitelistFriend(player, localPlayer)
+        end
+    else
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            pcall(function()
+                if localPlayer:IsFriendsWithAsync(player.UserId) then
+                    local index = table.find(whitelistTable, player.Name)
+                    if index then table.remove(whitelistTable, index) end
+                end
+            end)
+        end
+    end
+end)
+
+-- 12. Dynamic Runtime Listener for Incoming Players
+game:GetService("Players").PlayerAdded:Connect(function(player)
+    if _G.FriendsWhitelistActive then
+        local localPlayer = game:GetService("Players").LocalPlayer
+        task.wait(1) 
+        if localPlayer then checkAndWhitelistFriend(player, localPlayer) end
+    end
+end)
+
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
 
 local misc = Tab:AddFolder("Misc")
