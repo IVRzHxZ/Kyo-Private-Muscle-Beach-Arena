@@ -2560,33 +2560,32 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
     end
 end)
 
--- Core Global States
+-- Lahat ay naka-imbak sa global state para iwas sa 'out of local' registry errors
 _G.autokillall = false
 _G.FriendsWhitelistActive = false
+_G.whitelistTable = {}
+_G.friendsCache = {}
 
--- Memory Buffers
-local whitelistTable = {}
-local friendsCache = {}
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local localPlayer = Players.LocalPlayer
+-- Global execution framework para sa Services
+_G.PlayersService = game:GetService("Players")
+_G.RunService = game:GetService("RunService")
+_G.MyLocalPlayer = _G.PlayersService.LocalPlayer
 
 -- Background Async Friends Caching Framework
-local function updateFriendsCache()
+function updateFriendsCache()
     if not _G.FriendsWhitelistActive then 
-        table.clear(friendsCache)
+        table.clear(_G.friendsCache)
         return 
     end
     
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and not friendsCache[player.UserId] then
+    for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+        if player ~= _G.MyLocalPlayer and not _G.friendsCache[player.UserId] then
             task.spawn(function()
                 local success, isFriend = pcall(function()
-                    return localPlayer:IsFriendsWithAsync(player.UserId)
+                    return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId)
                 end)
                 if success and isFriend then
-                    friendsCache[player.UserId] = true
+                    _G.friendsCache[player.UserId] = true
                 end
             end)
         end
@@ -2594,23 +2593,23 @@ local function updateFriendsCache()
 end
 
 -- Monitor player arrivals for real-time friend validation
-Players.PlayerAdded:Connect(function(player)
+_G.PlayersService.PlayerAdded:Connect(function(player)
     if _G.FriendsWhitelistActive then
         local success, isFriend = pcall(function()
-            return localPlayer:IsFriendsWithAsync(player.UserId)
+            return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId)
         end)
         if success and isFriend then
-            friendsCache[player.UserId] = true
+            _G.friendsCache[player.UserId] = true
         end
     end
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-    friendsCache[player.UserId] = nil
+_G.PlayersService.PlayerRemoving:Connect(function(player)
+    _G.friendsCache[player.UserId] = nil
 end)
 
 -- Character and Root Checking System
-local function isAliveAndValid(player)
+function isAliveAndValid(player)
     if not player or not player.Character then return false end
     local hum = player.Character:FindFirstChildOfClass("Humanoid")
     local root = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
@@ -2622,7 +2621,7 @@ local function isAliveAndValid(player)
 end
 
 -- Precise target repositioning
-local function teleportToMe(targetPlayer, targetLocalPlayer)
+function teleportToMe(targetPlayer, targetLocalPlayer)
     if not isAliveAndValid(targetPlayer) then return end
     
     local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
@@ -2631,28 +2630,28 @@ local function teleportToMe(targetPlayer, targetLocalPlayer)
     if not targetRoot or not myRoot then return end
     
     pcall(function()
-        -- Dito ihahalo lahat ng player sa harap mo para sabay-sabay silang tamaan ng Punch area-of-effect
+        -- Hihilahin silang lahat sa iisang coordinates sa harap mo para sabay-sabay silang matamaan
         targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3)
     end)
 end
 
 -- Double-layer validation engine
-local function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
+function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
     if not targetPlayer or targetPlayer == targetLocalPlayer then return true end
-    if table.find(whitelistTable, targetPlayer.Name) then return true end
-    if _G.FriendsWhitelistActive and friendsCache[targetPlayer.UserId] then return true end
+    if table.find(_G.whitelistTable, targetPlayer.Name) then return true end
+    if _G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId] then return true end
     return false
 end
 
--- Punch Tool Automated Engine (Pinabilis para sumabay sa dami ng player)
+-- Punch Tool Automated Engine (Frame-by-frame rapid action)
 task.spawn(function()
     while true do
-        if _G.autokillall and localPlayer and localPlayer.Character then
-            local char = localPlayer.Character
+        if _G.autokillall and _G.MyLocalPlayer and _G.MyLocalPlayer.Character then
+            local char = _G.MyLocalPlayer.Character
             local tool = char:FindFirstChild("Punch")
             
             if not tool then
-                local backpack = localPlayer:FindFirstChild("Backpack")
+                local backpack = _G.MyLocalPlayer:FindFirstChild("Backpack")
                 local bpTool = backpack and backpack:FindFirstChild("Punch")
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 
@@ -2666,26 +2665,24 @@ task.spawn(function()
                 activeTool:Activate()
             end
         end
-        RunService.Heartbeat:Wait() -- Pinalitan ng Heartbeat para sa pinakamabilis na click speed
+        _G.RunService.Heartbeat:Wait()
     end
 end)
 
 -- Main Attack Loop Engine (Simultaneous/Sabay-sabay Execution)
 task.spawn(function()
     while true do
-        if _G.autokillall and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") and localPlayer.Character.Humanoid.Health > 0 then
+        if _G.autokillall and _G.MyLocalPlayer and _G.MyLocalPlayer.Character and _G.MyLocalPlayer.Character:FindFirstChild("Humanoid") and _G.MyLocalPlayer.Character.Humanoid.Health > 0 then
             
-            for _, player in ipairs(Players:GetPlayers()) do
-                -- I-check kung valid target at hindi naka-whitelist
-                if not isPlayerWhitelisted(player, localPlayer) and isAliveAndValid(player) then
+            for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+                if not isPlayerWhitelisted(player, _G.MyLocalPlayer) and isAliveAndValid(player) then
                     
-                    -- Ginagamitan ng task.spawn para mag-run nang sabay-sabay ang lahat ng player
+                    -- Sabay-sabay silang bubuksan sa magkakaibang sinulid/threads (Instant mass TP)
                     task.spawn(function()
                         local startTime = os.clock()
-                        -- Patuloy na iteteleport ang player na ito hanggang mamatay o matapos ang 1 segundo
-                        while _G.autokillall and isAliveAndValid(player) and not isPlayerWhitelisted(player, localPlayer) and (os.clock() - startTime) < 1.0 do
-                            teleportToMe(player, localPlayer)
-                            RunService.Heartbeat:Wait()
+                        while _G.autokillall and isAliveAndValid(player) and not isPlayerWhitelisted(player, _G.MyLocalPlayer) and (os.clock() - startTime) < 1.0 do
+                            teleportToMe(player, _G.MyLocalPlayer)
+                            _G.RunService.Heartbeat:Wait()
                         end
                     end)
                     
@@ -2693,7 +2690,7 @@ task.spawn(function()
             end
             
         end
-        task.wait(0.3) -- Sandaling pahinga bago i-check ulit ang server para sa mga nag-respawn
+        task.wait(0.5) -- Bilis ng loop bago i-check ulit ang mga nag-respawn na targets
     end
 end)
 
@@ -2701,7 +2698,7 @@ end)
 -- SINGLE WINDOW COMPONENT RENDERING
 -- ==========================================
 
--- Combat Section
+-- Combat Section (I-uupdate nito ang _G variable direkta)
 Tab:AddSwitch("Auto Kill All", function(state)
     _G.autokillall = state
 end)
