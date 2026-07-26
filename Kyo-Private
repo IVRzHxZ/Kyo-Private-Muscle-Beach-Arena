@@ -1966,45 +1966,49 @@ if not LocalPlayer then
     LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 end
 
+-- Pinagsama lahat sa iisang global table para maiwasan ang 200 local register limit
+if _G.LocalTracker then _G.LocalTracker = nil end
+_G.LocalTracker = {
+    Config = {
+        Stats = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"},
+        Suffixes = {"K", "M", "B", "T", "QA", "QI"}
+    },
+    Labels = {},
+    StartStats = {},
+    CachedObjects = {},
+    Connections = {},
+    TotalGained = {},
+    LastValues = {},
+    Rates = {},
+    LastUpdates = {},
+    StartTime = os.time(),
+    Utils = {}
+}
+
+local Tracker = _G.LocalTracker
+
 local TrackerTab = nil
 pcall(function() TrackerTab = window:AddTab("Stats 📊") end)
 
 local ClockLabel = TrackerTab:AddLabel("Session Time: 00:00:00")
 
-local startTime = os.time() 
-
-local myStatNames = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"}
-local My_UI_Labels = {}
-local startingStats = {}
-local cachedObjects = {} 
-local liveConnections = {} 
-
--- Persistent Trackers
-local totalGainedSession = {} 
-local lastKnownValues = {}    
-local statRatesPerSecond = {} -- Dito na i-se-save ang real-time speed ng farm mo
-local lastUpdateTimes = {}
-
-local function updateLabelText(name, content)
-    local label = My_UI_Labels[name]
+Tracker.Utils.updateLabelText = function(name, content)
+    local label = Tracker.Labels[name]
     if not label then return end
     local ok = pcall(function() label.Text = content end)
     if not ok then ok = pcall(function() label:SetText(content) end) end
     if not ok then pcall(function() label:UpdateLabel(content) end) end
 end
 
--- Lag-Free, Stripped Down Multiplier Formatter
-local suffixes = {"K", "M", "B", "T", "QA", "QI"}
-local function formatNumber(value)
+Tracker.Utils.formatNumber = function(value)
     if not value or typeof(value) ~= "number" then return "0" end
     if value < 1000 then return tostring(math.floor(value)) end
     local index = math.floor(math.log10(value) / 3)
-    local suffix = suffixes[index] or ""
+    local suffix = Tracker.Config.Suffixes[index] or ""
     return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. suffix
 end
 
--- Optimized Fast Static Scanner
-local function scanForStatFast(statName)
+Tracker.Utils.scanForStatFast = function(statName)
     if not LocalPlayer then return nil end
     local lowerTarget = string.lower(statName)
     
@@ -2041,149 +2045,120 @@ local function scanForStatFast(statName)
     return nil
 end
 
--- Hyper-Optimized Display Writer (No more gained / elapsedSeconds!)
-local function computeAndRenderStat(name, currentVal)
+Tracker.Utils.computeAndRenderStat = function(name, currentVal)
     local currentTime = os.time()
-    local startVal = startingStats[name]
+    local startVal = Tracker.StartStats[name]
     
     if not startVal then
-        startingStats[name] = currentVal
+        Tracker.StartStats[name] = currentVal
         startVal = currentVal
-        totalGainedSession[name] = 0
-        lastKnownValues[name] = currentVal
-        lastUpdateTimes[name] = currentTime
-        statRatesPerSecond[name] = 0
+        Tracker.TotalGained[name] = 0
+        Tracker.LastValues[name] = currentVal
+        Tracker.LastUpdates[name] = currentTime
+        Tracker.Rates[name] = 0
     end
     
-    if not totalGainedSession[name] then totalGainedSession[name] = 0 end
-    if not lastKnownValues[name] then lastKnownValues[name] = currentVal end
-    if not lastUpdateTimes[name] then lastUpdateTimes[name] = currentTime end
-    if not statRatesPerSecond[name] then statRatesPerSecond[name] = 0 end
+    if not Tracker.TotalGained[name] then Tracker.TotalGained[name] = 0 end
+    if not Tracker.LastValues[name] then Tracker.LastValues[name] = currentVal end
+    if not Tracker.LastUpdates[name] then Tracker.LastUpdates[name] = currentTime end
+    if not Tracker.Rates[name] then Tracker.Rates[name] = 0 end
 
-    -- REBIRTH DETECTED: Handles stat resets cleanly
-    if currentVal < lastKnownValues[name] then
-        local progressBeforeReset = math.max(lastKnownValues[name] - startVal, 0)
-        totalGainedSession[name] = totalGainedSession[name] + progressBeforeReset
-        
-        startingStats[name] = currentVal
+    if currentVal < Tracker.LastValues[name] then
+        local progressBeforeReset = math.max(Tracker.LastValues[name] - startVal, 0)
+        Tracker.TotalGained[name] = Tracker.TotalGained[name] + progressBeforeReset
+        Tracker.StartStats[name] = currentVal
         startVal = currentVal
     end
 
-    -- DELTA REAL-TIME RATE CALCULATION
-    local diff = currentVal - lastKnownValues[name]
+    local diff = currentVal - Tracker.LastValues[name]
     if diff > 0 then
-        local timePassed = math.max(currentTime - lastUpdateTimes[name], 1)
-        statRatesPerSecond[name] = diff / timePassed
-        lastUpdateTimes[name] = currentTime
+        local timePassed = math.max(currentTime - Tracker.LastUpdates[name], 1)
+        Tracker.Rates[name] = diff / timePassed
+        Tracker.LastUpdates[name] = currentTime
     end
     
-    lastKnownValues[name] = currentVal
+    Tracker.LastValues[name] = currentVal
 
     local currentGain = math.max(currentVal - startVal, 0)
-    local gained = totalGainedSession[name] + currentGain
-    local formattedCurrent = formatNumber(currentVal)
-    
-    -- Real-time rate scaling based on actual tick increments
-    local activeRate = statRatesPerSecond[name]
+    local gained = Tracker.TotalGained[name] + currentGain
+    local formattedCurrent = Tracker.Utils.formatNumber(currentVal)
+    local activeRate = Tracker.Rates[name] or 0
     
     if gained > 0 and activeRate > 0 then
-        local perMinute = activeRate * 60
-        local perHour   = activeRate * 3600
-        local perDay    = activeRate * 86400
-        local perWeek   = activeRate * 604800
-
-        updateLabelText(name, string.format(
+        Tracker.Utils.updateLabelText(name, string.format(
             "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
-            name, formattedCurrent, formatNumber(gained),
-            formatNumber(perMinute), formatNumber(perHour), formatNumber(perDay), formatNumber(perWeek)
+            name, formattedCurrent, Tracker.Utils.formatNumber(gained),
+            Tracker.Utils.formatNumber(activeRate * 60), Tracker.Utils.formatNumber(activeRate * 3600), 
+            Tracker.Utils.formatNumber(activeRate * 86400), Tracker.Utils.formatNumber(activeRate * 604800)
         ))
     else
-        -- Kapag nakatigil ang farm, ipapakita lang ang kasalukuyang total gained nang hindi nag-zi-zero ang text format
-        updateLabelText(name, string.format("%s: %s (+%s) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formattedCurrent, formatNumber(gained)))
+        Tracker.Utils.updateLabelText(name, string.format("%s: %s (+%s) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formattedCurrent, Tracker.Utils.formatNumber(gained)))
     end
 end
 
--- Bind instant data signals cleanly with 0 loop overhead
-local function bindObjectSignals(name, obj)
-    cachedObjects[name] = obj
-    startingStats[name] = tonumber(obj.Value) or 0
-    lastKnownValues[name] = tonumber(obj.Value) or 0
-    totalGainedSession[name] = totalGainedSession[name] or 0
-    lastUpdateTimes[name] = os.time()
-    statRatesPerSecond[name] = 0
+Tracker.Utils.bindObjectSignals = function(name, obj)
+    Tracker.CachedObjects[name] = obj
+    Tracker.StartStats[name] = tonumber(obj.Value) or 0
+    Tracker.LastValues[name] = tonumber(obj.Value) or 0
+    Tracker.TotalGained[name] = Tracker.TotalGained[name] or 0
+    Tracker.LastUpdates[name] = os.time()
+    Tracker.Rates[name] = 0
     
-    if liveConnections[name] then
-        pcall(function() liveConnections[name]:Disconnect() end)
+    if Tracker.Connections[name] then
+        pcall(function() Tracker.Connections[name]:Disconnect() end)
     end
     
-    liveConnections[name] = obj.Changed:Connect(function(newVal)
-        computeAndRenderStat(name, tonumber(newVal) or 0)
+    Tracker.Connections[name] = obj.Changed:Connect(function(newVal)
+        Tracker.Utils.computeAndRenderStat(name, tonumber(newVal) or 0)
     end)
     
-    computeAndRenderStat(name, startingStats[name])
+    Tracker.Utils.computeAndRenderStat(name, Tracker.StartStats[name])
 end
 
 -- Create Labels instantly pre-loaded with live numbers
-for i = 1, #myStatNames do
-    local name = myStatNames[i]
-    startingStats[name] = 0
+for i = 1, #Tracker.Config.Stats do
+    local name = Tracker.Config.Stats[i]
+    Tracker.StartStats[name] = 0
     
-    local foundObj = scanForStatFast(name)
+    local foundObj = Tracker.Utils.scanForStatFast(name)
     local currentText = name .. ": 0 (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0"
     
     if foundObj then
         local initialVal = tonumber(foundObj.Value) or 0
-        startingStats[name] = initialVal
-        lastKnownValues[name] = initialVal
-        currentText = string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formatNumber(initialVal))
+        Tracker.StartStats[name] = initialVal
+        Tracker.LastValues[name] = initialVal
+        currentText = string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Tracker.Utils.formatNumber(initialVal))
     end
     
-    pcall(function() My_UI_Labels[name] = TrackerTab:AddLabel(currentText) end)
+    pcall(function() Tracker.Labels[name] = TrackerTab:AddLabel(currentText) end)
     
     if foundObj then
-        bindObjectSignals(name, foundObj)
+        Tracker.Utils.bindObjectSignals(name, foundObj)
     end
 end
 
--- Combined Clock and Decay Loop
+-- Combined Clock and Decay Loop Engine
 task.spawn(function()
     while task.wait(1) do
-        local elapsedSeconds = math.max(os.time() - startTime, 1)
+        local elapsedSeconds = math.max(os.time() - Tracker.StartTime, 1)
         local currentTime = os.time()
         
-        -- Update Clock Label
         local hours = math.floor(elapsedSeconds / 3600)
         local minutes = math.floor((elapsedSeconds % 3600) / 60)
         local seconds = elapsedSeconds % 60
-        ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
+        pcall(function() ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds) end)
         
-        -- Force recalculation and apply decay if player stops training
-        for i = 1, #myStatNames do
-            local name = myStatNames[i]
-            local obj = cachedObjects[name]
+        for i = 1, #Tracker.Config.Stats do
+            local name = Tracker.Config.Stats[i]
+            local obj = Tracker.CachedObjects[name]
             if obj then
-                -- DECAY LOGIC: Kung lampas 4 segundo nang walang pumapasok na stat, unti-unting ibaba ang display rate
-                local lastActive = lastUpdateTimes[name] or currentTime
+                local lastActive = Tracker.LastUpdates[name] or currentTime
+                -- TINAPOS NA DECAY LOGIC: Unti-unting bababa ang speed kapag huminto sa pag-farm ang player
                 if currentTime - lastActive > 4 then
-                    statRatesPerSecond[name] = math.max((statRatesPerSecond[name] or 0) * 0.7, 0)
-                    if statRatesPerSecond[name] < 0.1 then statRatesPerSecond[name] = 0 end
+                    Tracker.Rates[name] = math.max((Tracker.Rates[name] or 0) * 0.75, 0)
+                    if Tracker.Rates[name] < 0.1 then Tracker.Rates[name] = 0 end
+                    Tracker.Utils.computeAndRenderStat(name, tonumber(obj.Value) or 0)
                 end
-                
-                computeAndRenderStat(name, tonumber(obj.Value) or 0)
-            end
-        end
-    end
-end)
-
--- Lightweight background handler to catch instances that load late
-LocalPlayer.ChildAdded:Connect(function(child)
-    if child:IsA("Folder") or child:IsA("Configuration") then
-        task.wait(0.5)
-        for i = 1, #myStatNames do
-            local name = myStatNames[i]
-            if not cachedObjects[name] then
-                local foundObj = scanForStatFast(name)
-                if foundObj then bindObjectSignals(name, foundObj) end
             end
         end
     end
@@ -2200,26 +2175,27 @@ if not LocalPlayer then
     LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 end
 
--- Shared configuration block and dynamic state manager
+-- Pinagsama lahat sa iisang global table para makatipid sa local registers
 if _G.TrackerCore then _G.TrackerCore = nil end
 _G.TrackerCore = {
     Config = {
         Stats = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"},
         Suffixes = {"K", "M", "B", "T", "QA", "QI", "SX", "SP"}
     },
-    SpyState = { target = nil, startTime = os.time(), labels = {}, start = {}, total = {}, last = {}, rate = {}, ticks = {} }
+    SpyState = { target = nil, startTime = os.time(), labels = {}, start = {}, total = {}, last = {}, rate = {}, ticks = {} },
+    Utils = {}
 }
 
 local Core = _G.TrackerCore
 
-local function updateLabelText(label, content)
+Core.Utils.updateLabelText = function(label, content)
     if not label then return end
     local ok = pcall(function() label.Text = content end)
     if not ok then ok = pcall(function() label:SetText(content) end) end
     if not ok then pcall(function() label:UpdateLabel(content) end) end
 end
 
-local function formatNumber(value)
+Core.Utils.formatNumber = function(value)
     if not value or typeof(value) ~= "number" then return "0" end
     local absVal = math.abs(value)
     if absVal < 1000 then 
@@ -2230,7 +2206,7 @@ local function formatNumber(value)
     return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. (Core.Config.Suffixes[index] or "")
 end
 
-local function locatePlayerStatObject(playerInstance, statName)
+Core.Utils.locatePlayerStatObject = function(playerInstance, statName)
     if not playerInstance then return nil end
     local lowerTarget = string.lower(statName)
     local classicHubs = {"leaderstats", "leaderstats2", "Stats", "PlayerData", "Data", "Currency"}
@@ -2283,7 +2259,7 @@ local PlayerDropdown = SpyTab and SpyTab:AddDropdown("Select Player...", functio
         S.target, S.startTime, S.start, S.total, S.last, S.rate, S.ticks = found, os.time(), {}, {}, {}, {}, {}
         local curT = os.time()
         for _, name in ipairs(Core.Config.Stats) do
-            local obj = locatePlayerStatObject(found, name)
+            local obj = Core.Utils.locatePlayerStatObject(found, name)
             local val = obj and tonumber(obj.Value) or 0
             S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = val, val, 0, curT, 0
         end
@@ -2324,7 +2300,7 @@ task.spawn(function()
         
         if S.target and S.target.Parent == Players then
             for _, name in ipairs(Core.Config.Stats) do
-                local statObj = locatePlayerStatObject(S.target, name)
+                local statObj = Core.Utils.locatePlayerStatObject(S.target, name)
                 if statObj and S.labels[name] then
                     local currentVal = tonumber(statObj.Value) or 0
                     if not S.start[name] then
@@ -2353,19 +2329,19 @@ task.spawn(function()
                     
                     if gained > 0 then
                         if r <= 0 then r = gained / math.max(currentTime - S.startTime, 1) end
-                        updateLabelText(S.labels[name], string.format(
+                        Core.Utils.updateLabelText(S.labels[name], string.format(
                             "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
-                            name, formatNumber(currentVal), formatNumber(gained),
-                            formatNumber(r * 60), formatNumber(r * 3600), formatNumber(r * 86400), formatNumber(r * 604800)
+                            name, Core.Utils.formatNumber(currentVal), Core.Utils.formatNumber(gained),
+                            Core.Utils.formatNumber(r * 60), Core.Utils.formatNumber(r * 3600), Core.Utils.formatNumber(r * 86400), Core.Utils.formatNumber(r * 604800)
                         ))
                     else
-                        updateLabelText(S.labels[name], string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formatNumber(currentVal)))
+                        Core.Utils.updateLabelText(S.labels[name], string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Core.Utils.formatNumber(currentVal)))
                     end
                 end
             end
         else
             for _, name in ipairs(Core.Config.Stats) do
-                updateLabelText(S.labels[name], name .. ": N/A (N/A) | /m: N/A | /h: N/A | /d: N/A | /w: N/A")
+                Core.Utils.updateLabelText(S.labels[name], name .. ": N/A (N/A) | /m: N/A | /h: N/A | /d: N/A | /w: N/A")
             end
         end
     end
