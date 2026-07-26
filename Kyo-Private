@@ -3098,7 +3098,7 @@ Tab:AddSwitch("Spy Target", function(state)
 end)
 
 -- Friend Framework Validation System Switch Toggle
-Tab:AddSwitch("Friend Whitelist", function(state)
+Tab:AddSwitch("Whitelist Friends", function(state)
     _G.FriendsWhitelistActive = state
     if state then
         updateFriendsCache()
