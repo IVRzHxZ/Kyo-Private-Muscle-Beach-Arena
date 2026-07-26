@@ -2496,6 +2496,202 @@ Tab:AddButton("Server Hop + Auto Kill", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/IVRzHxZ/Farming-Auto-KIll-in-xKyo/refs/heads/main/farmkillsxkyo"))()
 end)
 
+-- ============================================================================
+-- GLOBAL CONVERSION ARCHITECTURE & CONNECTION CLEANUP MEMORY
+-- ============================================================================
+_G.TotalKills = 0
+_G.CurrentStreak = 0
+_G.KillsGained = 0
+
+local HeartbeatConnection = nil
+local RenderSteppedConnection = nil
+local TargetScreenGui = nil
+
+local _G_Players = game:GetService("Players")
+local MyLocalPlayer = _G_Players.LocalPlayer
+local _G_RunService = game:GetService("RunService")
+local _G_CoreGui = game:GetService("CoreGui")
+
+-- Core Cleanup Function (Mabilisang pagpatay sa threads kapag isinara ang UI)
+local function destroyKillTrackerUI()
+    if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
+    if RenderSteppedConnection then RenderSteppedConnection:Disconnect() RenderSteppedConnection = nil end
+    
+    if TargetScreenGui then
+        TargetScreenGui:Destroy()
+        TargetScreenGui = nil
+    elseif _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
+        _G_CoreGui.UniversalKillTrackerUI:Destroy()
+    end
+    
+    _G.TotalKills = 0
+    _G.CurrentStreak = 0
+    _G.KillsGained = 0
+end
+
+local function createKillTrackerUI()
+    -- I-clear ang lumang window kung may nakabukas pa para iwas sa patong-patong na UI
+    if _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
+        _G_CoreGui.UniversalKillTrackerUI:Destroy()
+    end
+
+    TargetScreenGui = Instance.new("ScreenGui")
+    TargetScreenGui.Name = "UniversalKillTrackerUI"
+    TargetScreenGui.Parent = _G_CoreGui
+    TargetScreenGui.ResetOnSpawn = false
+
+    -- Main Drag Frame
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 220, 0, 140)
+    MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true 
+    MainFrame.Parent = TargetScreenGui
+
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 8)
+    MainCorner.Parent = MainFrame
+
+    -- Rainbow Border Stroke
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Thickness = 2
+    FrameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    FrameStroke.Parent = MainFrame
+
+    -- UI Title Header Label
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "TitleLabel"
+    TitleLabel.Size = UDim2.new(1, 0, 0, 28)
+    TitleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    TitleLabel.BorderSizePixel = 0
+    TitleLabel.Text = "            Kills Counter UI"
+    TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    TitleLabel.TextSize = 22
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 8)
+    TitleCorner.Parent = TitleLabel
+
+    -- ADDED: ScreenGui Close "X" Button 
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 24, 0, 24)
+    CloseButton.Position = UDim2.new(1, -26, 0, 2)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    CloseButton.BackgroundTransparency = 1 -- Transparent background para malinis tingnan
+    CloseButton.Text = "X"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80) -- Kulay pulang X para sa delikadong itsura
+    CloseButton.TextSize = 14
+    CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.Parent = MainFrame
+
+    -- Line 1: Kills Display
+    local KillCounterLabel = Instance.new("TextLabel")
+    KillCounterLabel.Name = "KillCounterLabel"
+    KillCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    KillCounterLabel.Position = UDim2.new(0, 0, 0, 32)
+    KillCounterLabel.BackgroundTransparency = 1
+    KillCounterLabel.Text = "Total Kills: 0"
+    KillCounterLabel.TextSize = 18
+    KillCounterLabel.Font = Enum.Font.SourceSansBold
+    KillCounterLabel.Parent = MainFrame
+
+    -- Line 2: KillStreak Display
+    local StreakCounterLabel = Instance.new("TextLabel")
+    StreakCounterLabel.Name = "StreakCounterLabel"
+    StreakCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    StreakCounterLabel.Position = UDim2.new(0, 0, 0, 64)
+    StreakCounterLabel.BackgroundTransparency = 1
+    StreakCounterLabel.Text = "KillStreak: 0"
+    StreakCounterLabel.TextSize = 18
+    StreakCounterLabel.Font = Enum.Font.SourceSansBold
+    StreakCounterLabel.Parent = MainFrame
+
+    -- Line 3: Kills Gained Display
+    local GainedCounterLabel = Instance.new("TextLabel")
+    GainedCounterLabel.Name = "GainedCounterLabel"
+    GainedCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    GainedCounterLabel.Position = UDim2.new(0, 0, 0, 96)
+    GainedCounterLabel.BackgroundTransparency = 1
+    GainedCounterLabel.Text = "Kills Gained: 0"
+    GainedCounterLabel.TextSize = 18
+    GainedCounterLabel.Font = Enum.Font.SourceSansBold
+    GainedCounterLabel.Parent = MainFrame
+
+    local initialKillsSet = false
+    local lastKillsValue = 0
+
+    -- Forced Polling Value Listener Engine Thread Hook
+    HeartbeatConnection = _G_RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local leaderstats = MyLocalPlayer:FindFirstChild("leaderstats")
+            if leaderstats then
+                local killsObj = leaderstats:FindFirstChild("Kills") or leaderstats:FindFirstChild("kills")
+                if killsObj and killsObj:IsA("ValueBase") then
+                    _G.TotalKills = killsObj.Value or 0
+                    KillCounterLabel.Text = "Total Kills: " .. tostring(_G.TotalKills)
+                    
+                    if not initialKillsSet then
+                        lastKillsValue = _G.TotalKills
+                        initialKillsSet = true
+                    end
+                    
+                    if _G.TotalKills > lastKillsValue then
+                        local difference = _G.TotalKills - lastKillsValue
+                        _G.KillsGained = _G.KillsGained + difference
+                        lastKillsValue = _G.TotalKills
+                    elseif _G.TotalKills < lastKillsValue then
+                        lastKillsValue = _G.TotalKills
+                    end
+                    
+                    GainedCounterLabel.Text = "Kills Gained: " .. tostring(_G.KillsGained)
+                end
+                
+                local streakObj = leaderstats:FindFirstChild("KillStreak") or leaderstats:FindFirstChild("Killstreak") or leaderstats:FindFirstChild("Streak") or leaderstats:FindFirstChild("streak")
+                if streakObj and streakObj:IsA("ValueBase") then
+                    _G.CurrentStreak = streakObj.Value or 0
+                    StreakCounterLabel.Text = "KillStreak: " .. tostring(_G.CurrentStreak)
+                end
+            end
+        end)
+    end)
+
+    -- Smooth Rainbow RGB chroma execution loop hook
+    RenderSteppedConnection = _G_RunService.RenderStepped:Connect(function()
+        local speedMultiplier = 3 
+        local gameTime = os.clock() * speedMultiplier
+        
+        local r = math.sin(gameTime + 0) * 127 + 128
+        local g = math.sin(gameTime + 2) * 127 + 128
+        local b = math.sin(gameTime + 4) * 127 + 128
+        
+        local rainbowColor = Color3.fromRGB(r, g, b)
+        
+        FrameStroke.Color = rainbowColor
+        KillCounterLabel.TextColor3 = rainbowColor
+        StreakCounterLabel.TextColor3 = rainbowColor
+        GainedCounterLabel.TextColor3 = rainbowColor
+    end)
+
+    -- CLOSE BUTTON EVENT LISTEN TRIGGER (Dito isasara at lilinisin ang memory)
+    CloseButton.MouseButton1Click:Connect(function()
+        destroyKillTrackerUI()
+    end)
+end
+
+-- ============================================================================
+-- ELERIUM V2 TAB BUTTON REGISTRATION (Pinalitan ang Switch ng Button)
+-- ============================================================================
+Tab:AddButton("Kills Counter UI", function()
+    createKillTrackerUI()
+end)
+
 -- [[ UI Elements Setup ]]
 
 -- 5. Loop TP Kill All Switch
@@ -2830,147 +3026,87 @@ end)
 
 Tab:AddLabel("Auto Kill V2")
 
--- Lahat ay naka-imbak sa global state para iwas sa 'out of local' registry errors
-_G.autokillall = false    -- Original sequential method
-_G.autokillall2 = false   -- New multi-threaded method
-_G.autokilltarget = false
-_G.SingleTargetName = ""
-_G.FriendsWhitelistActive = false
-_G.SpectateTargetActive = false
-_G.whitelistTable = {}
-_G.friendsCache = {}
+-- ============================================================================
+-- GLOBAL STATE & SERVICES
+-- ============================================================================
+_G.autokillall, _G.autokillall2, _G.autokilltarget = false, false, false
+_G.SingleTargetName, _G.FriendsWhitelistActive, _G.SpectateTargetActive = "", false, false
+_G.whitelistTable, _G.friendsCache, _G.activeThreads = {}, {}, {} 
 _G.whitelistInputTextCache = "" 
 
--- Global execution framework para sa Services
 _G.PlayersService = game:GetService("Players")
 _G.RunService = game:GetService("RunService")
 _G.MyLocalPlayer = _G.PlayersService.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Background Async Friends Caching Framework
+-- ============================================================================
+-- BACKGROUND ASYNC FRIENDS CACHING FRAMEWORK
+-- ============================================================================
 function updateFriendsCache()
-    if not _G.FriendsWhitelistActive then 
-        table.clear(_G.friendsCache)
-        return 
-    end
-    
+    if not _G.FriendsWhitelistActive then table.clear(_G.friendsCache); return end
     for _, player in ipairs(_G.PlayersService:GetPlayers()) do
         if player ~= _G.MyLocalPlayer and not _G.friendsCache[player.UserId] then
             task.spawn(function()
-                local success, isFriend = pcall(function()
-                    return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId)
-                end)
-                if success and isFriend then
-                    _G.friendsCache[player.UserId] = true
-                end
+                local success, isFriend = pcall(function() return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId) end)
+                if success and isFriend then _G.friendsCache[player.UserId] = true end
             end)
         end
     end
 end
 
--- Monitor player arrivals for real-time friend validation
 _G.PlayersService.PlayerAdded:Connect(function(player)
     if _G.FriendsWhitelistActive then
-        local success, isFriend = pcall(function()
-            return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId)
-        end)
-        if success and isFriend then
-            _G.friendsCache[player.UserId] = true
-        end
+        local success, isFriend = pcall(function() return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId) end)
+        if success and isFriend then _G.friendsCache[player.UserId] = true end
     end
 end)
 
 _G.PlayersService.PlayerRemoving:Connect(function(player)
-    _G.friendsCache[player.UserId] = nil
+    _G.friendsCache[player.UserId] = nil; _G.activeThreads[player.UserId] = nil
 end)
 
--- Continuous verification sync loop for Friends Cache
 task.spawn(function()
     while true do
-        if _G.FriendsWhitelistActive then
-            updateFriendsCache()
-        end
+        if _G.FriendsWhitelistActive then updateFriendsCache() end
         task.wait(3)
     end
 end)
 
--- Character and Root Checking System
+-- ============================================================================
+-- UTILITY FUNCTIONS
+-- ============================================================================
 function isAliveAndValid(player)
     if not player or not player.Character then return false end
     local hum = player.Character:FindFirstChildOfClass("Humanoid")
     local root = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-    
-    if hum and hum.Health > 0 and root then
-        return true
-    end
-    return false
+    return (hum and hum.Health > 0 and root) and true or false
 end
 
--- Precise target repositioning
 function teleportToMe(targetPlayer, targetLocalPlayer)
     if not isAliveAndValid(targetPlayer) then return end
-    
     local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
     local myRoot = targetLocalPlayer.Character and (targetLocalPlayer.Character:FindFirstChild("HumanoidRootPart") or targetLocalPlayer.Character:FindFirstChild("Torso"))
-    
     if not targetRoot or not myRoot then return end
-    
-    pcall(function()
-        targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3)
-    end)
+    pcall(function() targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3) end)
 end
 
--- Double-layer validation engine (Fixed to support both Username and Nickname/DisplayName)
 function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
     if not targetPlayer or targetPlayer == targetLocalPlayer then return true end
-    
-    -- Ginawa nating lowercase ang pangalan ng player para magtugma kahit anong kapitalisasyon ang i-type mo
     local targetNameLower = targetPlayer.Name:lower()
     local targetDisplayLower = targetPlayer.DisplayName:lower()
-    
-    -- I-tse-tsek nito kung ang Username o Display Name ay nasa whitelist table mo
-    if table.find(_G.whitelistTable, targetNameLower) or table.find(_G.whitelistTable, targetDisplayLower) then 
-        return true 
-    end
-    
-    if _G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId] then return true end
-    return false
+    if table.find(_G.whitelistTable, targetNameLower) or table.find(_G.whitelistTable, targetDisplayLower) then return true end
+    return (_G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId]) and true or false
 end
 
--- Punch Tool Automated Engine (Rapid-action weapon activation)
-task.spawn(function()
-    while true do
-        if (_G.autokillall or _G.autokillall2 or _G.autokilltarget) and _G.MyLocalPlayer and _G.MyLocalPlayer.Character then
-            local char = _G.MyLocalPlayer.Character
-            local tool = char:FindFirstChild("Punch")
-            
-            if not tool then
-                local backpack = _G.MyLocalPlayer:FindFirstChild("Backpack")
-                local bpTool = backpack and backpack:FindFirstChild("Punch")
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                
-                if bpTool and hum and hum.Health > 0 then
-                    hum:EquipTool(bpTool)
-                end
-            end
-            
-            local activeTool = char:FindFirstChild("Punch")
-            if activeTool then
-                activeTool:Activate()
-            end
-        end
-        _G.RunService.Heartbeat:Wait()
-    end
-end)
-
--- Reset camera back to local player safely
 local function resetCamera()
     if _G.MyLocalPlayer.Character and _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         Camera.CameraSubject = _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     end
 end
 
--- Independent Spectate Engine (Para masubaybayan ang single target)
+-- ============================================================================
+-- SPECTATE TRACKING ENGINE (SPY TARGET - PERSISTENT DEATH TRACKING)
+-- ============================================================================
 task.spawn(function()
     while true do
         if _G.SpectateTargetActive and _G.SingleTargetName ~= "" then
@@ -2982,9 +3118,16 @@ task.spawn(function()
                     local userMatch = player.Name:lower():find(searchString)
                     local nickMatch = player.DisplayName:lower():find(searchString)
                     
-                    if (userMatch or nickMatch) and isAliveAndValid(player) then
-                        Camera.CameraSubject = player.Character:FindFirstChildOfClass("Humanoid")
+                    if (userMatch or nickMatch) then
                         targetFound = true
+                        if player.Character then
+                            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                            if hum then
+                                Camera.CameraSubject = hum
+                            else
+                                Camera.CameraSubject = player.Character
+                            end
+                        end
                         break
                     end
                 end
@@ -2994,7 +3137,7 @@ task.spawn(function()
                 resetCamera()
             end
         else
-            if Camera.CameraSubject ~= _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid") and _G.MyLocalPlayer.Character then
+            if _G.MyLocalPlayer.Character and Camera.CameraSubject ~= _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
                 resetCamera()
             end
         end
@@ -3002,130 +3145,114 @@ task.spawn(function()
     end
 end)
 
--- Main Attack Loop Engine
+-- ============================================================================
+-- AUTOMATED WEAPON ENGINE & MAIN ATTACK LOOP
+-- ============================================================================
 task.spawn(function()
     while true do
-        if _G.MyLocalPlayer and _G.MyLocalPlayer.Character and _G.MyLocalPlayer.Character:FindFirstChild("Humanoid") and _G.MyLocalPlayer.Character.Humanoid.Health > 0 then
+        if (_G.autokillall or _G.autokillall2 or _G.autokilltarget) and _G.MyLocalPlayer and _G.MyLocalPlayer.Character then
+            local char = _G.MyLocalPlayer.Character
+            local tool = char:FindFirstChild("Punch") or (_G.MyLocalPlayer:FindFirstChild("Backpack") and _G.MyLocalPlayer.Backpack:FindFirstChild("Punch"))
+            local hum = char:FindFirstChildOfClass("Humanoid")
             
-            -- ================================================================
-            -- METHOD 1: ORIGINAL AUTO KILL ALL (Sequential / Isa-isa Loop)
-            -- ================================================================
-            if _G.autokillall then
-                for _, player in ipairs(_G.PlayersService:GetPlayers()) do
-                    if not _G.autokillall then break end
-                    
-                    if not isPlayerWhitelisted(player, _G.MyLocalPlayer) and isAliveAndValid(player) then
-                        local startTime = os.clock()
-                        
-                        while _G.autokillall and isAliveAndValid(player) and not isPlayerWhitelisted(player, _G.MyLocalPlayer) and (os.clock() - startTime) < 1.0 do
-                            teleportToMe(player, _G.MyLocalPlayer)
-                            _G.RunService.Heartbeat:Wait()
-                        end
-                        task.wait(0.05) 
-                    end
-                end
+            if tool and hum and hum.Health > 0 then
+                if not char:FindFirstChild("Punch") then hum:EquipTool(tool) end
+                if char:FindFirstChild("Punch") then char.Punch:Activate() end
             end
             
-            -- ================================================================
-            -- METHOD 2: AUTO KILL ALL 2 (Multi-Threaded / Sabay-sabay Loop)
-            -- ================================================================
-            if _G.autokillall2 then
-                for _, player in ipairs(_G.PlayersService:GetPlayers()) do
-                    if not isPlayerWhitelisted(player, _G.MyLocalPlayer) and isAliveAndValid(player) then
-                        task.spawn(function()
-                            local startTime = os.clock()
-                            while _G.autokillall2 and isAliveAndValid(player) and not isPlayerWhitelisted(player, _G.MyLocalPlayer) and (os.clock() - startTime) < 1.0 do
-                                teleportToMe(player, _G.MyLocalPlayer)
-                                _G.RunService.Heartbeat:Wait()
-                            end
-                        end)
-                    end
-                end
-            end
-
-                        -- ================================================================
-            -- METHOD 3: ISOLATED SINGLE TARGET EXECUTION
-            -- ================================================================
+            -- Targeted Killing/Teleportation Logic
             if _G.autokilltarget and _G.SingleTargetName ~= "" then
                 local searchString = _G.SingleTargetName:lower()
                 for _, player in ipairs(_G.PlayersService:GetPlayers()) do
                     if player ~= _G.MyLocalPlayer and not isPlayerWhitelisted(player, _G.MyLocalPlayer) then
-                        local userMatch = player.Name:lower():find(searchString)
-                        local nickMatch = player.DisplayName:lower():find(searchString) 
-                        
-                        if (userMatch or nickMatch) and isAliveAndValid(player) then
-                            while _G.autokilltarget and isAliveAndValid(player) and not isPlayerWhitelisted(player, _G.MyLocalPlayer) and _G.SingleTargetName ~= "" do
+                        if player.Name:lower():find(searchString) or player.DisplayName:lower():find(searchString) then
+                            if isAliveAndValid(player) then
                                 teleportToMe(player, _G.MyLocalPlayer)
-                                _G.RunService.Heartbeat:Wait()
                             end
                         end
                     end
                 end
+            elseif _G.autokillall or _G.autokillall2 then
+                for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+                    if not isPlayerWhitelisted(player, _G.MyLocalPlayer) and isAliveAndValid(player) then
+                        if _G.autokillall2 then
+                            if not _G.activeThreads[player.UserId] then
+                                _G.activeThreads[player.UserId] = true
+                                task.spawn(function() teleportToMe(player, _G.MyLocalPlayer); task.wait(0.1); _G.activeThreads[player.UserId] = nil end)
+                            end
+                        else
+                            teleportToMe(player, _G.MyLocalPlayer)
+                        end
+                    end
+                end
             end
-            
         end
-        task.wait(0.5)
+        _G.RunService.Heartbeat:Wait() 
     end
 end)
 
 -- ============================================================================
--- SINGLE WINDOW COMPONENT RENDERING
+-- UI COMPONENTS (ELERIUM V2 INTEGRATED WITH SMART WHITELIST)
 -- ============================================================================
+Tab:AddSwitch("Auto Kill All", function(state) _G.autokillall = state end)
+Tab:AddSwitch("Auto Kill All 2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
 
--- Original Loop Switch
-Tab:AddSwitch("Auto Kill All", function(state)
-    _G.autokillall = state
-end)
-
--- Multi-Threaded Loop Switch
-Tab:AddSwitch("Auto Kill All 2", function(state)
-    _G.autokillall2 = state
-end)
-
--- Target Identification Text Input Box
+-- Target Input Field (Tiyaking pindutin ang Enter pagkatapos mag-type)
 Tab:AddTextBox("Target Player Name", function(text)
     _G.SingleTargetName = text
-end)
+end, {["clear"] = false})
 
--- Single Target Logic Execution Toggle Switch
-Tab:AddSwitch("Auto Kill Target", function(state)
-    _G.autokilltarget = state
-end)
+Tab:AddSwitch("Auto Kill Target", function(state) _G.autokilltarget = state end)
+Tab:AddSwitch("Spy Target", function(state) _G.SpectateTargetActive = state end)
 
--- Focus Tracking Module Switch
-Tab:AddSwitch("Spy Target", function(state)
-    _G.SpectateTargetActive = state
-end)
+Tab:AddSwitch("Whitelist Friends", function(state) _G.FriendsWhitelistActive = state; if state then updateFriendsCache() else table.clear(_G.friendsCache) end end)
 
--- Friend Framework Validation System Switch Toggle
-Tab:AddSwitch("Whitelist Friends", function(state)
-    _G.FriendsWhitelistActive = state
-    if state then
-        updateFriendsCache()
-    else
-        table.clear(_G.friendsCache)
-    end
-end)
-
--- TextBox para isulat yung pangalan (Kahit ano: @username o Nickname)
+-- Whitelist Input Field (Tiyaking pindutin ang Enter pagkatapos mag-type)
 Tab:AddTextBox("Whitelist Player Name", function(text)
     _G.whitelistInputTextCache = text
-end)
+end, {["clear"] = false})
 
--- Button para opisyal na i-add ang tinype mong pangalan sa whitelist array
+-- SMART NICKNAME / USERNAME DETECTOR EXTENSION BUTTON
 Tab:AddButton("Add Whitelist Player", function()
-    -- Tinatanggal ang spaces at ginagawang lowercase para laging mag-match sa isPlayerWhitelisted
-    local targetName = _G.whitelistInputTextCache:gsub("%s+", ""):lower()
-    if targetName ~= "" and not table.find(_G.whitelistTable, targetName) then
-        table.insert(_G.whitelistTable, targetName)
-        print("Whitelisted (Username or Nickname): " .. targetName)
+    if _G.whitelistInputTextCache and _G.whitelistInputTextCache ~= "" then
+        local searchInput = _G.whitelistInputTextCache:lower():gsub("%s+", "")
+        local playerFound = false
+        
+        -- Mag-scan sa active players para hanapin kung sino ang tinutukoy mong Nickname o Username
+        for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+            local actualUsername = player.Name:lower()
+            local actualDisplayName = player.DisplayName:lower()
+            
+            if actualUsername:find(searchInput) or actualDisplayName:find(searchInput) then
+                playerFound = true
+                -- Awtomatikong ipapasok pareho ang tunay na Username at DisplayName para iwas mintis sa whitelist check
+                if not table.find(_G.whitelistTable, actualUsername) then
+                    table.insert(_G.whitelistTable, actualUsername)
+                end
+                if not table.find(_G.whitelistTable, actualDisplayName) then
+                    table.insert(_G.whitelistTable, actualDisplayName)
+                end
+                print("Successfully Whitelisted: " .. player.Name .. " (@" .. player.DisplayName .. ")")
+            end
+        end -- Closes the for loop cleanly AFTER scanning all users
+        
+        -- Fallback: Kung offline o wala sa server ang player, i-add pa rin yung tinype para kapag pumasok siya ay protektado siya
+        if not playerFound then
+            if not table.find(_G.whitelistTable, searchInput) then
+                table.insert(_G.whitelistTable, searchInput)
+                print("Whitelisted Offline Tag/Name: " .. searchInput)
+            else
+                print("Name is already inside the whitelist framework.")
+            end
+        end
+    else
+        print("Error: Whitelist TextBox is empty! Type a name first.")
     end
 end)
 
--- Array Destructor Table Purge Mechanism Button Interface
 Tab:AddButton("Clear All Whitelist", function()
     table.clear(_G.whitelistTable)
-    print("Custom Whitelist table has been cleared completely.")
+    print("Whitelist cleared completely.")
 end)
 
 Tab:AddLabel("Auto Kill V3 For Pc Only!!!")
