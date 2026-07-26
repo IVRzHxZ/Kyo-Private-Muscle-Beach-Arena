@@ -2499,7 +2499,7 @@ end)
 -- [[ UI Elements Setup ]]
 
 -- 5. Loop TP Kill All Switch
-Tab:AddSwitch("Loop TP Kill All", function(Value)
+Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
     LoopKillAllActive = Value
     if Value then
         task.spawn(function()
@@ -2558,6 +2558,152 @@ Tab:AddSwitch("Loop TP Kill All", function(Value)
             end
         end)
     end
+end)
+
+-- Core Global States
+_G.autokillall = false
+_G.FriendsWhitelistActive = false
+
+-- Memory Buffers
+local whitelistTable = {}
+local friendsCache = {}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+
+-- Background Async Friends Caching Framework
+local function updateFriendsCache()
+    if not _G.FriendsWhitelistActive then 
+        table.clear(friendsCache)
+        return 
+    end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and not friendsCache[player.UserId] then
+            task.spawn(function()
+                local success, isFriend = pcall(function()
+                    return localPlayer:IsFriendsWithAsync(player.UserId)
+                end)
+                if success and isFriend then
+                    friendsCache[player.UserId] = true
+                end
+            end)
+        end
+    end
+end
+
+-- Monitor player arrivals for real-time friend validation
+Players.PlayerAdded:Connect(function(player)
+    if _G.FriendsWhitelistActive then
+        local success, isFriend = pcall(function()
+            return localPlayer:IsFriendsWithAsync(player.UserId)
+        end)
+        if success and isFriend then
+            friendsCache[player.UserId] = true
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    friendsCache[player.UserId] = nil
+end)
+
+-- Character and Root Checking System
+local function isAliveAndValid(player)
+    if not player or not player.Character then return false end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    local root = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+    
+    if hum and hum.Health > 0 and root then
+        return true
+    end
+    return false
+end
+
+-- Precise target repositioning
+local function teleportToMe(targetPlayer, targetLocalPlayer)
+    if not isAliveAndValid(targetPlayer) then return end
+    
+    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
+    local myRoot = targetLocalPlayer.Character and (targetLocalPlayer.Character:FindFirstChild("HumanoidRootPart") or targetLocalPlayer.Character:FindFirstChild("Torso"))
+    
+    if not targetRoot or not myRoot then return end
+    
+    pcall(function()
+        -- Dito ihahalo lahat ng player sa harap mo para sabay-sabay silang tamaan ng Punch area-of-effect
+        targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3)
+    end)
+end
+
+-- Double-layer validation engine
+local function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
+    if not targetPlayer or targetPlayer == targetLocalPlayer then return true end
+    if table.find(whitelistTable, targetPlayer.Name) then return true end
+    if _G.FriendsWhitelistActive and friendsCache[targetPlayer.UserId] then return true end
+    return false
+end
+
+-- Punch Tool Automated Engine (Pinabilis para sumabay sa dami ng player)
+task.spawn(function()
+    while true do
+        if _G.autokillall and localPlayer and localPlayer.Character then
+            local char = localPlayer.Character
+            local tool = char:FindFirstChild("Punch")
+            
+            if not tool then
+                local backpack = localPlayer:FindFirstChild("Backpack")
+                local bpTool = backpack and backpack:FindFirstChild("Punch")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                
+                if bpTool and hum and hum.Health > 0 then
+                    hum:EquipTool(bpTool)
+                end
+            end
+            
+            local activeTool = char:FindFirstChild("Punch")
+            if activeTool then
+                activeTool:Activate()
+            end
+        end
+        RunService.Heartbeat:Wait() -- Pinalitan ng Heartbeat para sa pinakamabilis na click speed
+    end
+end)
+
+-- Main Attack Loop Engine (Simultaneous/Sabay-sabay Execution)
+task.spawn(function()
+    while true do
+        if _G.autokillall and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") and localPlayer.Character.Humanoid.Health > 0 then
+            
+            for _, player in ipairs(Players:GetPlayers()) do
+                -- I-check kung valid target at hindi naka-whitelist
+                if not isPlayerWhitelisted(player, localPlayer) and isAliveAndValid(player) then
+                    
+                    -- Ginagamitan ng task.spawn para mag-run nang sabay-sabay ang lahat ng player
+                    task.spawn(function()
+                        local startTime = os.clock()
+                        -- Patuloy na iteteleport ang player na ito hanggang mamatay o matapos ang 1 segundo
+                        while _G.autokillall and isAliveAndValid(player) and not isPlayerWhitelisted(player, localPlayer) and (os.clock() - startTime) < 1.0 do
+                            teleportToMe(player, localPlayer)
+                            RunService.Heartbeat:Wait()
+                        end
+                    end)
+                    
+                end
+            end
+            
+        end
+        task.wait(0.3) -- Sandaling pahinga bago i-check ulit ang server para sa mga nag-respawn
+    end
+end)
+
+-- ==========================================
+-- SINGLE WINDOW COMPONENT RENDERING
+-- ==========================================
+
+-- Combat Section
+Tab:AddSwitch("Auto Kill All", function(state)
+    _G.autokillall = state
 end)
 
 -- 6. Target Filter Box
