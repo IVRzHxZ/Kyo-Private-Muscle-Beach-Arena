@@ -3214,7 +3214,7 @@ end)
 Tab:AddSwitch("Whitelist Friends", function(state) _G.FriendsWhitelistActive = state; if state then updateFriendsCache() else table.clear(_G.friendsCache) end end)
 
 -- Whitelist Input Field
-Tab:AddTextBox("Whitelist Player Name", function(text)
+Tab:AddTextBox("Type Player Name To Whitelist", function(text)
     _G.whitelistInputTextCache = text
 end, {["clear"] = false})
 
@@ -3258,7 +3258,7 @@ Tab:AddButton("Clear All Whitelist", function()
     print("Whitelist cleared completely.")
 end)
 
-Tab:AddLabel("Auto Kill V3 For Pc Only!!!")
+Tab:AddLabel("Auto Kill V3")
 
 -- 3. Core Operational Data Layers (Tables)
 local whitelistTable = {} 
@@ -3441,34 +3441,6 @@ Tab:AddTextBox("Singel Auto Kill", function(text)
     _G.SingleTargetName = text
 end)
 
--- 8. Whitelist Textbox
-Tab:AddTextBox("Type Player Name To Whitelist", function(text)
-    _G.WhitelistInputText = text
-end)
-
--- 9. Whitelist Confirmation Button
-Tab:AddButton("Add to Whitelist", function()
-    local text = _G.WhitelistInputText
-    if text == "" then return end
-    
-    local searchString = text:lower()
-    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-        local usernameMatch = player.Name:lower():find(searchString)
-        local nicknameMatch = player.DisplayName:lower():find(searchString)
-        
-        if usernameMatch or nicknameMatch then
-            if not table.find(whitelistTable, player.Name) then
-                table.insert(whitelistTable, player.Name)
-            end
-        end
-    end
-end)
-
--- 10. Clear Whitelist Button
-Tab:AddButton("Clear Whitelist", function()
-    table.clear(whitelistTable)
-end)
-
 -- 11. Friend Filtering Management Switch
 Tab:AddSwitch('Whitelist Friends', function(state)
     local localPlayer = game:GetService("Players").LocalPlayer
@@ -3498,6 +3470,34 @@ game:GetService("Players").PlayerAdded:Connect(function(player)
         task.wait(1) 
         if localPlayer then checkAndWhitelistFriend(player, localPlayer) end
     end
+end)
+
+-- 8. Whitelist Textbox
+Tab:AddTextBox("Type Player Name To Whitelist", function(text)
+    _G.WhitelistInputText = text
+end)
+
+-- 9. Whitelist Confirmation Button
+Tab:AddButton("Add to Whitelist", function()
+    local text = _G.WhitelistInputText
+    if text == "" then return end
+    
+    local searchString = text:lower()
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        local usernameMatch = player.Name:lower():find(searchString)
+        local nicknameMatch = player.DisplayName:lower():find(searchString)
+        
+        if usernameMatch or nicknameMatch then
+            if not table.find(whitelistTable, player.Name) then
+                table.insert(whitelistTable, player.Name)
+            end
+        end
+    end
+end)
+
+-- 10. Clear Whitelist Button
+Tab:AddButton("Clear Whitelist", function()
+    table.clear(whitelistTable)
 end)
 
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
