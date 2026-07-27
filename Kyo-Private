@@ -2758,7 +2758,7 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
 end)
 
 -- New Loop TP Kill All V2 (Fast Teleport & Multi-Hit)
-Tab:AddSwitch("Loop TP Kill All V2", function(Value)
+Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
     FastLoopKillAllV2Active = Value
     if Value then
         task.spawn(function()
