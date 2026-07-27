@@ -3099,8 +3099,11 @@ function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
 end
 
 local function resetCamera()
-    if _G.MyLocalPlayer.Character and _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        Camera.CameraSubject = _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if _G.MyLocalPlayer.Character then
+        local hum = _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            Camera.CameraSubject = hum
+        end
     end
 end
 
@@ -3134,10 +3137,6 @@ task.spawn(function()
             end
             
             if not targetFound then
-                resetCamera()
-            end
-        else
-            if _G.MyLocalPlayer.Character and Camera.CameraSubject ~= _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
                 resetCamera()
             end
         end
@@ -3195,19 +3194,26 @@ end)
 -- UI COMPONENTS (ELERIUM V2 INTEGRATED WITH SMART WHITELIST)
 -- ============================================================================
 Tab:AddSwitch("Auto Kill All", function(state) _G.autokillall = state end)
-Tab:AddSwitch("Auto Kill All 2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
+Tab:AddSwitch("Auto Kill All V2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
 
--- Target Input Field (Tiyaking pindutin ang Enter pagkatapos mag-type)
+-- Target Input Field
 Tab:AddTextBox("Target Player Name", function(text)
     _G.SingleTargetName = text
 end, {["clear"] = false})
 
 Tab:AddSwitch("Auto Kill Target", function(state) _G.autokilltarget = state end)
-Tab:AddSwitch("Spy Target", function(state) _G.SpectateTargetActive = state end)
+
+-- Fixed Spy Target Switch Toggle (No more forced loops when disabled)
+Tab:AddSwitch("Spy Target", function(state) 
+    _G.SpectateTargetActive = state 
+    if not state then 
+        resetCamera() 
+    end 
+end)
 
 Tab:AddSwitch("Whitelist Friends", function(state) _G.FriendsWhitelistActive = state; if state then updateFriendsCache() else table.clear(_G.friendsCache) end end)
 
--- Whitelist Input Field (Tiyaking pindutin ang Enter pagkatapos mag-type)
+-- Whitelist Input Field
 Tab:AddTextBox("Whitelist Player Name", function(text)
     _G.whitelistInputTextCache = text
 end, {["clear"] = false})
@@ -3218,14 +3224,12 @@ Tab:AddButton("Add Whitelist Player", function()
         local searchInput = _G.whitelistInputTextCache:lower():gsub("%s+", "")
         local playerFound = false
         
-        -- Mag-scan sa active players para hanapin kung sino ang tinutukoy mong Nickname o Username
         for _, player in ipairs(_G.PlayersService:GetPlayers()) do
             local actualUsername = player.Name:lower()
             local actualDisplayName = player.DisplayName:lower()
             
             if actualUsername:find(searchInput) or actualDisplayName:find(searchInput) then
                 playerFound = true
-                -- Awtomatikong ipapasok pareho ang tunay na Username at DisplayName para iwas mintis sa whitelist check
                 if not table.find(_G.whitelistTable, actualUsername) then
                     table.insert(_G.whitelistTable, actualUsername)
                 end
@@ -3234,9 +3238,8 @@ Tab:AddButton("Add Whitelist Player", function()
                 end
                 print("Successfully Whitelisted: " .. player.Name .. " (@" .. player.DisplayName .. ")")
             end
-        end -- Closes the for loop cleanly AFTER scanning all users
+        end
         
-        -- Fallback: Kung offline o wala sa server ang player, i-add pa rin yung tinype para kapag pumasok siya ay protektado siya
         if not playerFound then
             if not table.find(_G.whitelistTable, searchInput) then
                 table.insert(_G.whitelistTable, searchInput)
