@@ -2448,10 +2448,11 @@ end)
 -- [[ MOVE TO TOP: Core Logic Variables ]]
 local player = game.Players.LocalPlayer
 local whitelistFriendsActive = false 
-local TargetInput = ""               
-local WhitelistedPlayers = {}        -- Dictionary mapping UserId -> true
-local MultiInputText = ""            -- Stores the raw comma-separated text string
+local TargetInput = ""             
+local WhitelistedPlayers = {}       -- Dictionary mapping UserId -> true
+local MultiInputText = ""           -- Stores the raw comma-separated text string
 local LoopKillAllActive = false
+local FastLoopKillAllV2Active = false
 local LoopKilling = false
 local Spectating = false
 
@@ -2707,7 +2708,7 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
                 local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
 
                 if myChar and myRoot and myHumanoid then
-                    local targetList = Players:GetPlayers()
+                    local targetList = game.Players:GetPlayers()
                     
                     for _, targetPlayer in ipairs(targetList) do
                         if not LoopKillAllActive then break end
@@ -2716,7 +2717,7 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
                             local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
                             local timeSpent = 0
                             
-                            while LoopKillAllActive and tRoot and targetPlayer.Parent == Players and timeSpent < 0.5 do
+                            while LoopKillAllActive and tRoot and targetPlayer.Parent == game.Players and timeSpent < 0.5 do
                                 myChar = player.Character
                                 myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
                                 myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
@@ -2751,6 +2752,68 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
                     end
                 end
                 task.wait(0.1) 
+            end
+        end)
+    end
+end)
+
+-- New Loop TP Kill All V2 (Fast Teleport & Multi-Hit)
+Tab:AddSwitch("Loop TP Kill All V2", function(Value)
+    FastLoopKillAllV2Active = Value
+    if Value then
+        task.spawn(function()
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            
+            while FastLoopKillAllV2Active do
+                local myChar = player.Character
+                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+                if myChar and myRoot and myHumanoid then
+                    local targetList = game.Players:GetPlayers()
+                    
+                    for _, targetPlayer in ipairs(targetList) do
+                        if not FastLoopKillAllV2Active then break end
+                        
+                        if targetPlayer ~= player and targetPlayer.Character and not isWhitelisted(targetPlayer) then
+                            local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            
+                            if tRoot and tHumanoid and tHumanoid.Health > 0 then
+                                -- Instant Teleport Burst on Target
+                                for _ = 1, 3 do
+                                    if not FastLoopKillAllV2Active or tHumanoid.Health <= 0 then break end
+                                    
+                                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                                    
+                                    local tool = myChar:FindFirstChild("Punch")
+                                    if not tool then
+                                        local backpack = player:FindFirstChild("Backpack")
+                                        local bpTool = backpack and backpack:FindFirstChild("Punch")
+                                        if bpTool then
+                                            myHumanoid:EquipTool(bpTool)
+                                            tool = bpTool
+                                        end
+                                    end
+                                    
+                                    if tool then
+                                        tool:Activate()
+                                    end
+                                    
+                                    local remotes = ReplicatedStorage:FindFirstChild("RemotesEvent")
+                                    if remotes and remotes:FindFirstChild("SizeChanged") then
+                                        pcall(function()
+                                            remotes.SizeChanged:FireServer(1)
+                                        end)
+                                    end
+                                    
+                                    task.wait(0.1)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait()
             end
         end)
     end
@@ -2834,7 +2897,7 @@ end
 -- Reusable punch function
 local function firePunch()
     local args = {
-        "RightHand" -- FIXED: Removed the invalid '=' sign
+        "RightHand"
     }
     game:GetService("ReplicatedStorage").remotes.punchRequest:FireServer(unpack(args))
 end
@@ -2844,11 +2907,10 @@ local autoPunchEnabled = false
 Tab:AddSwitch("Auto Punch (No Anim)", function(state)
     autoPunchEnabled = state
     
-    -- Runs a continuous loop in the background when switched on
     task.spawn(function()
         while autoPunchEnabled do
             firePunch()
-            task.wait(0.1) -- Delay between punches (0.1 seconds)
+            task.wait(0.1)
         end
     end)
 end)
@@ -2915,72 +2977,6 @@ game:GetService('RunService').RenderStepped:Connect(function()
                     hrp.CanCollide = false
                 end)
             end
-        end
-    end
-end)
-
--- [[ Core Logic Variables ]]
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
-
-local voidTrollEnabled = false -- Keeps track of your Switch state
-local isLoopRunning = false    -- Prevents multiple loops from running at once
-
--- Update character reference if you reset or respawn
-player.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    hrp = character:WaitForChild("HumanoidRootPart")
-end)
-
--- [[ Repeated Void Escape Loop ]]
-local function startVoidLoop()
-    if isLoopRunning then return end
-    isLoopRunning = true
-    
-    -- This keeps running as long as the switch is turned ON
-    while voidTrollEnabled and hrp and hrp.Parent do
-        -- Anchor your character's root part to freeze your physics presence on the surface
-        hrp.Anchored = true
-        
-        -- Store current height settings and location
-        workspace.FallenPartsDestroyHeight = -1000
-        local lastCFrame = hrp.CFrame
-
-        -- Teleport deep into the void safely away from attackers
-        hrp.CFrame = CFrame.new(Vector3.new(0, -500, 0))
-
-        task.wait(0.01) -- Time spent hiding in the void
-
-        -- Teleport safely back to your starting spot
-        hrp.CFrame = lastCFrame
-        workspace.FallenPartsDestroyHeight = -500
-        
-        -- Unanchor so you can move normally again on the surface
-        hrp.Anchored = false
-        
-        task.wait(0.01) -- Delay before teleporting down again
-    end
-    
-    -- Clean up physics state just in case you toggle it off mid-teleport
-    if hrp then
-        hrp.Anchored = false
-    end
-    isLoopRunning = false
-end
-
--- [[ Elerium v2 AddSwitch Setup ]]
-local loopKillSwitch = Tab:AddSwitch("Anti Loop kill", function(Value)
-    voidTrollEnabled = Value
-    print("Anti Loop Kill Status: ", voidTrollEnabled)
-    
-    -- Start the repeating loop if turned ON
-    if voidTrollEnabled then
-        task.spawn(startVoidLoop)
-    else
-        -- If turned OFF instantly make sure physics are restored
-        if hrp then
-            hrp.Anchored = false
         end
     end
 end)
