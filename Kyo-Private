@@ -9,7 +9,7 @@ local windowTitle = "🩸 Blooming Shrine Private 🩸 | Welcome, " .. LocalPlay
 
 local window = library:AddWindow(windowTitle, {
     main_color = Color3.fromRGB(41, 74, 122),
-    min_size = Vector2.new(530, 500),
+    min_size = Vector2.new(540, 500),
     can_resize = false
 })
 
@@ -2448,9 +2448,16 @@ end)
 -- [[ MOVE TO TOP: Core Logic Variables ]]
 local player = game.Players.LocalPlayer
 local whitelistFriendsActive = false 
-local TargetInput = ""             
+local TargetInput = ""            
 local WhitelistedPlayers = {}       -- Dictionary mapping UserId -> true
 local MultiInputText = ""           -- Stores the raw comma-separated text string
+
+-- Target Kill List Variables
+local TargetKillListText = ""       -- Stores the raw comma-separated target kill list string
+local TargetKillListActive = false  -- Toggle state for Loop TP Kill Target List
+local TargetKillPlayers = {}        -- Dictionary mapping UserId -> true for target kill list
+local SpyTargetKillListActive = false -- Toggle state for spying on the target kill list
+
 local LoopKillAllActive = false
 local FastLoopKillAllV2Active = false
 local LoopKilling = false
@@ -2836,7 +2843,7 @@ Tab:AddSwitch("TP Kill Target", function(state)
                 local target = GetPlayerByInput(TargetInput)
                 
                 if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and 
-                   player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                     
                     player.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
                     
@@ -2876,6 +2883,138 @@ Tab:AddSwitch("Spy Target", function(state)
                     end
                 end
                 task.wait(0.1)
+            end
+        end)
+    else
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            camera.CameraSubject = player.Character.Humanoid
+        end
+    end
+end)
+
+-- [[ UPDATED: Target Kill List Features ]]
+
+Tab:AddTextBox("Type Names To Kill List", function(text)
+    TargetKillListText = text
+end, {
+    ["placeholder"] = "e.g. user1, user2, user3",
+    ["clear"] = false
+})
+
+Tab:AddButton("Add to Target Kill List", function()
+    if TargetKillListText == "" then 
+        print("[TARGET KILL LIST] Text box is empty!")
+        return 
+    end
+    
+    for nameSegment in string.gmatch(TargetKillListText, "([^,]+)") do
+        local target = GetPlayerByInput(nameSegment)
+        if target then
+            TargetKillPlayers[target.UserId] = true
+            print("[TARGET KILL LIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
+        else
+            local cleanName = nameSegment:match("^%s*(.-)%s*$")
+            print("[TARGET KILL LIST] Could not find player: '" .. cleanName .. "'")
+        end
+    end
+end)
+
+Tab:AddButton("Clear All Target Kill List", function()
+    TargetKillListText = ""
+    TargetKillPlayers = {}
+    print("[TARGET KILL LIST] Target Kill List cleared completely.")
+end)
+
+Tab:AddSwitch("TP Kill Target List", function(Value)
+    TargetKillListActive = Value
+    if Value then
+        task.spawn(function()
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            
+            while TargetKillListActive do
+                local myChar = player.Character
+                local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+                if myChar and myRoot and myHumanoid then
+                    for userId, _ in pairs(TargetKillPlayers) do
+                        if not TargetKillListActive then break end
+                        
+                        local targetPlayer = game.Players:GetPlayerByUserId(userId)
+                        
+                        if targetPlayer and targetPlayer ~= player and targetPlayer.Character and not isWhitelisted(targetPlayer) then
+                            local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            local timeSpent = 0
+                            
+                            while TargetKillListActive and tRoot and tHumanoid and tHumanoid.Health > 0 and targetPlayer.Parent == game.Players and timeSpent < 0.5 do
+                                myChar = player.Character
+                                myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                                myHumanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                                
+                                if not (myChar and myRoot and myHumanoid) then break end
+                                
+                                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                                
+                                local tool = myChar:FindFirstChild("Punch")
+                                if not tool then
+                                    local backpack = player:FindFirstChild("Backpack")
+                                    local bpTool = backpack and backpack:FindFirstChild("Punch")
+                                    if bpTool then
+                                        myHumanoid:EquipTool(bpTool)
+                                        tool = bpTool
+                                    end
+                                end
+                                
+                                if tool then
+                                    tool:Activate()
+                                end
+                                
+                                local remotes = ReplicatedStorage:FindFirstChild("RemotesEvent")
+                                if remotes and remotes:FindFirstChild("SizeChanged") then
+                                    pcall(function()
+                                        remotes.SizeChanged:FireServer(1)
+                                    end)
+                                end
+                                
+                                task.wait(0.05)
+                                timeSpent = timeSpent + 0.05
+                            end
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+-- Spy Target Kill List Switch (Cycles through active players in your kill list)
+Tab:AddSwitch("Spy Target Kill List", function(state)
+    SpyTargetKillListActive = state
+    local camera = workspace.CurrentCamera
+    
+    if state then
+        task.spawn(function()
+            while SpyTargetKillListActive do
+                local foundTarget = false
+                for userId, _ in pairs(TargetKillPlayers) do
+                    if not SpyTargetKillListActive then break end
+                    local targetPlayer = game.Players:GetPlayerByUserId(userId)
+                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 then
+                        camera.CameraSubject = targetPlayer.Character.Humanoid
+                        foundTarget = true
+                        task.wait(3) -- Spectate each target for 3 seconds before rotating to the next one
+                    end
+                end
+                
+                -- If no valid target is found/alive, fallback to local player temporarily
+                if not foundTarget then
+                    if player.Character and player.Character:FindFirstChild("Humanoid") then
+                        camera.CameraSubject = player.Character.Humanoid
+                    end
+                    task.wait(1)
+                end
             end
         end)
     else
@@ -2951,7 +3090,7 @@ end)
 _G.HeadSize = 25
 _G.HitboxEnabled = false 
 
-Tab:AddSwitch("Kill Aura", function(Value)
+Tab:AddSwitch("Kill Aura Range", function(Value)
     _G.HitboxEnabled = Value
     
     if not Value then
@@ -2996,7 +3135,7 @@ end, {
 })
 
 -- 3. Whitelist Action Button (Processes the multi-string)
-Tab:AddButton("Whitelist Players", function()
+Tab:AddButton("Add Whitelist Players", function()
     if MultiInputText == "" then 
         print("[WHITELIST] Text box is empty!")
         return 
@@ -3006,16 +3145,16 @@ Tab:AddButton("Whitelist Players", function()
         local target = GetPlayerByInput(nameSegment)
         if target then
             WhitelistedPlayers[target.UserId] = true
-            print("[WHITELIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
+            print("[WHITELIST] Added: " + target.Name + " (" + target.DisplayName + ")")
         else
             local cleanName = nameSegment:match("^%s*(.-)%s*$")
-            print("[WHITELIST] Could not find player: '" .. cleanName .. "'")
+            print("[WHITELIST] Could not find player: '" + cleanName + "'")
         end
     end
 end)
 
 -- 4. Clear Whitelist Action Button
-Tab:AddButton("Clear Whitelist", function()
+Tab:AddButton("Clear All Whitelist", function()
     WhitelistedPlayers = {}
     print("[WHITELIST] Whitelist cleared completely.")
 end)
@@ -3025,10 +3164,11 @@ Tab:AddLabel("Auto Kill V2")
 -- ============================================================================
 -- GLOBAL STATE & SERVICES
 -- ============================================================================
-_G.autokillall, _G.autokillall2, _G.autokilltarget = false, false, false
-_G.SingleTargetName, _G.FriendsWhitelistActive, _G.SpectateTargetActive = "", false, false
-_G.whitelistTable, _G.friendsCache, _G.activeThreads = {}, {}, {} 
+_G.autokillall, _G.autokillall2, _G.autokilltarget, _G.autokilltargetlist = false, false, false, false
+_G.SingleTargetName, _G.FriendsWhitelistActive, _G.SpectateTargetActive, _G.SpectateTargetListActive = "", false, false, false
+_G.whitelistTable, _G.targetKillListTable, _G.friendsCache, _G.activeThreads = {}, {}, {}, {} 
 _G.whitelistInputTextCache = "" 
+_G.targetKillInputTextCache = ""
 
 _G.PlayersService = game:GetService("Players")
 _G.RunService = game:GetService("RunService")
@@ -3094,6 +3234,18 @@ function isPlayerWhitelisted(targetPlayer, targetLocalPlayer)
     return (_G.FriendsWhitelistActive and _G.friendsCache[targetPlayer.UserId]) and true or false
 end
 
+function isPlayerOnTargetList(targetPlayer)
+    if not targetPlayer then return false end
+    local targetNameLower = targetPlayer.Name:lower()
+    local targetDisplayLower = targetPlayer.DisplayName:lower()
+    for _, entry in ipairs(_G.targetKillListTable) do
+        if targetNameLower:find(entry) or targetDisplayLower:find(entry) then
+            return true
+        end
+    end
+    return false
+end
+
 local function resetCamera()
     if _G.MyLocalPlayer.Character then
         local hum = _G.MyLocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -3108,6 +3260,7 @@ end
 -- ============================================================================
 task.spawn(function()
     while true do
+        -- Single Target Spectate
         if _G.SpectateTargetActive and _G.SingleTargetName ~= "" then
             local searchString = _G.SingleTargetName:lower()
             local targetFound = false
@@ -3135,6 +3288,26 @@ task.spawn(function()
             if not targetFound then
                 resetCamera()
             end
+        -- Target Kill List Spectate (Cycles through active/alive players in the target list)
+        elseif _G.SpectateTargetListActive and #_G.targetKillListTable > 0 then
+            local targetFound = false
+            for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+                if player ~= _G.MyLocalPlayer and isPlayerOnTargetList(player) then
+                    if isAliveAndValid(player) then
+                        targetFound = true
+                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            Camera.CameraSubject = hum
+                        else
+                            Camera.CameraSubject = player.Character
+                        end
+                        break
+                    end
+                end
+            end
+            if not targetFound then
+                resetCamera()
+            end
         end
         _G.RunService.Heartbeat:Wait()
     end
@@ -3145,7 +3318,7 @@ end)
 -- ============================================================================
 task.spawn(function()
     while true do
-        if (_G.autokillall or _G.autokillall2 or _G.autokilltarget) and _G.MyLocalPlayer and _G.MyLocalPlayer.Character then
+        if (_G.autokillall or _G.autokillall2 or _G.autokilltarget or _G.autokilltargetlist) and _G.MyLocalPlayer and _G.MyLocalPlayer.Character then
             local char = _G.MyLocalPlayer.Character
             local tool = char:FindFirstChild("Punch") or (_G.MyLocalPlayer:FindFirstChild("Backpack") and _G.MyLocalPlayer.Backpack:FindFirstChild("Punch"))
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -3156,7 +3329,15 @@ task.spawn(function()
             end
             
             -- Targeted Killing/Teleportation Logic
-            if _G.autokilltarget and _G.SingleTargetName ~= "" then
+            if _G.autokilltargetlist then
+                for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+                    if player ~= _G.MyLocalPlayer and not isPlayerWhitelisted(player, _G.MyLocalPlayer) then
+                        if isPlayerOnTargetList(player) and isAliveAndValid(player) then
+                            teleportToMe(player, _G.MyLocalPlayer)
+                        end
+                    end
+                end
+            elseif _G.autokilltarget and _G.SingleTargetName ~= "" then
                 local searchString = _G.SingleTargetName:lower()
                 for _, player in ipairs(_G.PlayersService:GetPlayers()) do
                     if player ~= _G.MyLocalPlayer and not isPlayerWhitelisted(player, _G.MyLocalPlayer) then
@@ -3187,13 +3368,13 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- UI COMPONENTS (ELERIUM V2 INTEGRATED WITH SMART WHITELIST)
+-- UI COMPONENTS (ELERIUM V2 INTEGRATED WITH SMART WHITELIST & TARGET LIST)
 -- ============================================================================
 Tab:AddSwitch("Auto Kill All", function(state) _G.autokillall = state end)
 Tab:AddSwitch("Auto Kill All V2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
 
 -- Target Input Field
-Tab:AddTextBox("Target Player Name", function(text)
+Tab:AddTextBox("Target Player Auto Kill Target", function(text)
     _G.SingleTargetName = text
 end, {["clear"] = false})
 
@@ -3202,6 +3383,60 @@ Tab:AddSwitch("Auto Kill Target", function(state) _G.autokilltarget = state end)
 -- Fixed Spy Target Switch Toggle (No more forced loops when disabled)
 Tab:AddSwitch("Spy Target", function(state) 
     _G.SpectateTargetActive = state 
+    if not state then 
+        resetCamera() 
+    end 
+end)
+
+-- Target Kill List UI Components
+Tab:AddTextBox("Target Player Kill List", function(text)
+    _G.targetKillInputTextCache = text
+end, {["clear"] = false})
+
+Tab:AddButton("Add To Target Kill List", function()
+    if _G.targetKillInputTextCache and _G.targetKillInputTextCache ~= "" then
+        local searchInput = _G.targetKillInputTextCache:lower():gsub("%s+", "")
+        local playerFound = false
+        
+        for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+            local actualUsername = player.Name:lower()
+            local actualDisplayName = player.DisplayName:lower()
+            
+            if actualUsername:find(searchInput) or actualDisplayName:find(searchInput) then
+                playerFound = true
+                if not table.find(_G.targetKillListTable, actualUsername) then
+                    table.insert(_G.targetKillListTable, actualUsername)
+                end
+                if not table.find(_G.targetKillListTable, actualDisplayName) then
+                    table.insert(_G.targetKillListTable, actualDisplayName)
+                end
+                print("Added to Target Kill List: " .. player.Name .. " (@" .. player.DisplayName .. ")")
+            end
+        end
+        
+        if not playerFound then
+            if not table.find(_G.targetKillListTable, searchInput) then
+                table.insert(_G.targetKillListTable, searchInput)
+                print("Added Offline Tag/Name to Target Kill List: " .. searchInput)
+            else
+                print("Name is already inside the Target Kill List.")
+            end
+        end
+    else
+        print("Error: Target Kill TextBox is empty! Type a name first.")
+    end
+end)
+
+Tab:AddButton("Clear All Target Kill List", function()
+    table.clear(_G.targetKillListTable)
+    print("Target Kill List cleared completely.")
+end)
+
+Tab:AddSwitch("Auto Kill Target List", function(state) _G.autokilltargetlist = state end)
+
+-- Spy Target List Switch Toggle
+Tab:AddSwitch("Spy Target List", function(state) 
+    _G.SpectateTargetListActive = state 
     if not state then 
         resetCamera() 
     end 
