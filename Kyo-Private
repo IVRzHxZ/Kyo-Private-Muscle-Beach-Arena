@@ -568,7 +568,7 @@ FarmTab:AddSwitch("Auto Rebirth", function(bool)
             game:GetService("ReplicatedStorage").remotes.rebirthRequest:FireServer()
             
             -- Essential delay to prevent game rate-limiting or crashing
-            task.wait(0.5) 
+            task.wait(0.1) 
         end
     end)
 end)
