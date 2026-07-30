@@ -145,7 +145,7 @@ end)
 local features = window:AddTab("Credits") -- Name of tab
 features:Show() -- shows the tab
 
-features:AddLabel("Blooming~Shrine Private")
+features:AddLabel("KyoXRimuru Private")
 features:AddLabel("Made By: Kyo")
 features:AddLabel("~~~~~~~~~~~~~~~~~~")
 
