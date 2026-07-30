@@ -17,128 +17,53 @@ task.spawn(function()
     local imgui = game:GetService("CoreGui"):WaitForChild("imgui", 10)
     if not imgui then return end
 
-    -- 🎨 EDITABLE COLORS
-    local BACKGROUND_COLOR = Color3.fromRGB(120, 120, 120) 
-    local TAB_COLOR = Color3.fromRGB(0, 0, 0)     
+    -- 🔥 FIRE ORANGE THEME COLORS
+    local FIRE_ORANGE = Color3.fromRGB(255, 90, 0)   -- Bright Flame Orange
+    local DARK_EMBER = Color3.fromRGB(255, 90, 0)     -- Dark Burnt Ember for Tabs/Accents
 
-    -- 🔒 PERMANENTLY LOCKED COLORS
-    local BAR_COLOR = Color3.fromRGB(20, 20, 20)        
-
-    -- Function para kulayan ang UI nang mabilis at walang lag
-    local function colorAndLockElement(element)
-        -- Proteksyon para hindi ma-spam o ma-loop ang pag-kulay sa element na nagawa na
-        if element:GetAttribute("UI_Colored") then return end
+    local function forceFireTheme(element)
+        if not element then return end
+        if element:GetAttribute("UI_ForcedFire") then return end
 
         local nameLower = element.Name:lower()
-        
-        -- 🛑 EMERGENCY DROPDOWN PROTECTION CRITERIA
-        local isDropdownElement = nameLower:match("dropdown") or nameLower:match("box") or nameLower:match("objects")
 
-        -- 🛠️ ELERIUM V2 FIXED FOLDER TRANSPARENCY EXCLUSION
-        local isFolderElement = nameLower:match("folder") or (element.Parent and element.Parent.Name:lower():match("folder"))
-        
-        if isFolderElement and not isDropdownElement then
-            -- Gawing invisible ang background at images ng mismong Folder structure
-            if element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
-                element.BackgroundTransparency = 1
-            elseif element:IsA("ImageLabel") or element:IsA("ImageButton") then
-                element.ImageTransparency = 1
-            end
-            
-            -- Siguraduhing litaw pa rin ang pangalan ng Folder at mga options sa loob nito
-            if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
-                element.TextTransparency = 0
-                element.TextColor3 = Color3.fromRGB(255, 255, 255) -- Gawing Puti para mababasa pa rin
-            end
-
-            element:SetAttribute("UI_Colored", true)
-            return -- I-break kaagad para hindi na makulayan ng gray/black sa baba
-        end
-
-        -- EXCLUSION CRITERIA: Huwag galawin ang toggles at indicators
-        if nameLower:match("indicator") or nameLower:match("checkmark") or element.Name == "Toggle_2" or nameLower:match("toggle") then
+        -- Huwag galawin ang toggles, indicators, at checkmarks para hindi masira
+        if nameLower:match("indicator") or nameLower:match("checkmark") or nameLower:match("toggle") then
             return 
         end
 
-        -- Helper function: Binabago lang ang kulay kung kailangan (Anti-Lag)
-        local function applyColor(property, targetColor)
-            if element[property] ~= targetColor then
-                element[property] = targetColor
-            end
-        end
-
-        -- 1. Deteksyon at Pag-kulay sa TABS (NORMAL IMAGE COLOR FIX)
-        if nameLower:match("tab") and not nameLower:match("background") and not nameLower:match("frame") then
-            if element:IsA("ImageLabel") or element:IsA("ImageButton") then
-                -- Kung ang element ay may totoong asset image (icon), ibalik sa normal/default white tint
-                if element.Image ~= "" then
-                    applyColor("ImageColor3", Color3.fromRGB(100, 100, 100))
-                else
-                    -- Kung structural layout frame lang ito, tsaka lang gagawing black background
-                    applyColor("ImageColor3", TAB_COLOR)
-                end
-            elseif element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
-                applyColor("BackgroundColor3", TAB_COLOR)
-            end
-            element:SetAttribute("UI_Colored", true)
-            return 
-        end
-
-        -- 2. Pag-lock sa kulay ng BARS at LINES
-        if nameLower:match("bar") or nameLower:match("line") then
-            if element:IsA("ImageLabel") or element:IsA("ImageButton") then
-                applyColor("ImageColor3", BAR_COLOR)
-            elseif element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
-                applyColor("BackgroundColor3", BAR_COLOR)
-            end
-            element:SetAttribute("UI_Colored", true)
-            return 
-        end
-
-        -- 3. Kulay ng Main Backgrounds at Frames
+        -- 1. Piliting gawing Flame Orange ang mga Image Assets
         if element:IsA("ImageLabel") or element:IsA("ImageButton") then
-            if nameLower:match("roundify") or nameLower:match("background") or nameLower:match("frame") then
-                applyColor("ImageColor3", BACKGROUND_COLOR)
+            if nameLower:match("tab") then
+                element.ImageColor3 = DARK_EMBER
             else
-                if element:IsA("ImageButton") then
-                    applyColor("BackgroundColor3", BACKGROUND_COLOR)
-                end
-            end
-        elseif element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
-            if nameLower:match("frame") or nameLower:match("background") then
-                applyColor("BackgroundColor3", BACKGROUND_COLOR) 
+                element.ImageColor3 = FIRE_ORANGE
             end
         end
-        
-        -- 4. Kulay ng mga Text (Inaalis ang asul)
+
+        -- 2. Piliting gawing Flame Orange ang mga Background Frames
+        if element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
+            if not nameLower:match("folder") then
+                element.BackgroundColor3 = FIRE_ORANGE
+            end
+        end
+
+        -- 3. Siguraduhing puti ang mga text para madaling basahin sa sunog na background
         if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
-            if element.TextColor3 == Color3.fromRGB(0, 0, 255) or (element.TextColor3.B > 0.7 and element.TextColor3.R < 0.3) or nameLower:match("tab") then
-                applyColor("TextColor3", Color3.fromRGB(255, 255, 255))
-            end
-        end
-        
-        -- 5. Kulay ng SelectionBox o Highlight
-        if element:IsA("SelectionBox") or element:IsA("Highlight") then
-            if element:IsA("SelectionBox") then
-                applyColor("Color3", BACKGROUND_COLOR)
-            elseif element:IsA("Highlight") then
-                applyColor("FillColor", BACKGROUND_COLOR)
-                applyColor("OutlineColor", BAR_COLOR)
-            end
+            element.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
 
-        -- Markahan ang element para hindi na ulit balikan ng script
-        element:SetAttribute("UI_Colored", true)
+        element:SetAttribute("UI_ForcedFire", true)
     end
 
-    -- Kulayan ang mga kasalukuyang elements gamit ang task.defer para sa mas swabeng load
+    -- I-apply sa lahat ng existing elements
     for _, element in pairs(imgui:GetDescendants()) do
-        task.defer(colorAndLockElement, element)
+        task.defer(forceFireTheme, element)
     end
 
-    -- Bantayan ang mga bagong pasok (dropdowns/tabs) gamit ang task.defer para iwas FPS drop
+    -- I-apply agad kapag may lumabas na bagong tab o menu
     imgui.DescendantAdded:Connect(function(element)
-        task.defer(colorAndLockElement, element)
+        task.defer(forceFireTheme, element)
     end)
 end)
 
