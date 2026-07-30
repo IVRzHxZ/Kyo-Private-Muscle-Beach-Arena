@@ -2826,7 +2826,7 @@ end, {
     ["clear"] = false
 })
 
-Tab:AddButton("Add to Target Kill List", function()
+Tab:AddButton("Add To Target Kill List", function()
     if TargetKillListText == "" then 
         print("[TARGET KILL LIST] Text box is empty!")
         return 
