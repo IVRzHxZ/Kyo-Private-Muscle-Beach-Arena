@@ -204,21 +204,6 @@ end)
 -- Visually toggle Elerium switch checkmark to ON immediately upon loading script
 AntiAFKSwitch:Set(true)
 
-local loopActive = false
-
-FarmTab:AddSwitch("FAKE Fast Rep", function(state)
-    loopActive = state
-    
-    -- Runs a continuous loop while the switch is toggled ON
-    task.spawn(function()
-        while loopActive do
-            local Event = game:GetService("ReplicatedStorage").EffectsGUi
-            firesignal(Event.OnClientEvent, "Strength", 1000000000)
-            task.wait(0.1) -- Adjustable delay to prevent game crashes
-        end
-    end)
-end)
-
 local isLocked = false
 local savedCFrame = nil -- Dito itatabi ang eksaktong lokasyon mo
 local player = game:GetService("Players").LocalPlayer
@@ -257,6 +242,21 @@ FarmTab:AddSwitch("Lock Position", function(state)
             end
         end
     end
+end)
+
+local loopActive = false
+
+FarmTab:AddSwitch("FAKE Fast Rep", function(state)
+    loopActive = state
+    
+    -- Runs a continuous loop while the switch is toggled ON
+    task.spawn(function()
+        while loopActive do
+            local Event = game:GetService("ReplicatedStorage").EffectsGUi
+            firesignal(Event.OnClientEvent, "Strength", 1000000000)
+            task.wait(0.1) -- Adjustable delay to prevent game crashes
+        end
+    end)
 end)
 
 -- Global Environment Setup
