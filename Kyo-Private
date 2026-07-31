@@ -2822,7 +2822,7 @@ Tab:AddSwitch("Spy Target", function(state)
     end
 end)
 
-Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 -- [[ UPDATED: Target Kill List Features ]]
 
@@ -3320,7 +3320,7 @@ Tab:AddSwitch("Spy Target", function(state)
     end 
 end)
 
-Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 -- Target Kill List UI Components
 Tab:AddTextBox("Target Player Kill List", function(text)
