@@ -2169,13 +2169,11 @@ end)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Instant execution initialization
 if not LocalPlayer then
     pcall(function() Players:GetPropertyChangedSignal("LocalPlayer"):Wait() end)
     LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 end
 
--- Pinagsama lahat sa iisang global table para maiwasan ang 200 local register limit
 if _G.LocalTracker then _G.LocalTracker = nil end
 _G.LocalTracker = {
     Config = {
@@ -2324,7 +2322,6 @@ Tracker.Utils.bindObjectSignals = function(name, obj)
     Tracker.Utils.computeAndRenderStat(name, Tracker.StartStats[name])
 end
 
--- Create Labels instantly pre-loaded with live numbers
 for i = 1, #Tracker.Config.Stats do
     local name = Tracker.Config.Stats[i]
     Tracker.StartStats[name] = 0
@@ -2346,7 +2343,6 @@ for i = 1, #Tracker.Config.Stats do
     end
 end
 
--- Combined Clock and Decay Loop Engine
 task.spawn(function()
     while task.wait(1) do
         local elapsedSeconds = math.max(os.time() - Tracker.StartTime, 1)
@@ -2362,7 +2358,6 @@ task.spawn(function()
             local obj = Tracker.CachedObjects[name]
             if obj then
                 local lastActive = Tracker.LastUpdates[name] or currentTime
-                -- TINAPOS NA DECAY LOGIC: Unti-unting bababa ang speed kapag huminto sa pag-farm ang player
                 if currentTime - lastActive > 4 then
                     Tracker.Rates[name] = math.max((Tracker.Rates[name] or 0) * 0.75, 0)
                     if Tracker.Rates[name] < 0.1 then Tracker.Rates[name] = 0 end
@@ -2374,187 +2369,188 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------
--- [SECTION 1: SHARED UTILITIES & CENTRAL CORES]
+-- [SECTION 2: SHARED UTILITIES & CENTRAL CORES]
 ---------------------------------------------------------
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+do
+    local PlayersRef = game:GetService("Players")
+    local LocalPlayerRef = PlayersRef.LocalPlayer
 
-if not LocalPlayer then
-    pcall(function() Players:GetPropertyChangedSignal("LocalPlayer"):Wait() end)
-    LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-end
-
--- Pinagsama lahat sa iisang global table para makatipid sa local registers
-if _G.TrackerCore then _G.TrackerCore = nil end
-_G.TrackerCore = {
-    Config = {
-        Stats = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"},
-        Suffixes = {"K", "M", "B", "T", "QA", "QI", "SX", "SP"}
-    },
-    SpyState = { target = nil, startTime = os.time(), labels = {}, start = {}, total = {}, last = {}, rate = {}, ticks = {} },
-    Utils = {}
-}
-
-local Core = _G.TrackerCore
-
-Core.Utils.updateLabelText = function(label, content)
-    if not label then return end
-    local ok = pcall(function() label.Text = content end)
-    if not ok then ok = pcall(function() label:SetText(content) end) end
-    if not ok then pcall(function() label:UpdateLabel(content) end) end
-end
-
-Core.Utils.formatNumber = function(value)
-    if not value or typeof(value) ~= "number" then return "0" end
-    local absVal = math.abs(value)
-    if absVal < 1000 then 
-        return tostring(value < 0 and -math.floor(absVal) or math.floor(absVal)) 
+    if not LocalPlayerRef then
+        pcall(function() PlayersRef:GetPropertyChangedSignal("LocalPlayer"):Wait() end)
+        LocalPlayerRef = PlayersRef.LocalPlayer or PlayersRef.PlayerAdded:Wait()
     end
-    local index = math.floor(math.log10(absVal) / 3)
-    if index > #Core.Config.Suffixes then index = #Core.Config.Suffixes end
-    return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. (Core.Config.Suffixes[index] or "")
-end
 
-Core.Utils.locatePlayerStatObject = function(playerInstance, statName)
-    if not playerInstance then return nil end
-    local lowerTarget = string.lower(statName)
-    local classicHubs = {"leaderstats", "leaderstats2", "Stats", "PlayerData", "Data", "Currency"}
-    
-    for i = 1, #classicHubs do
-        local folder = playerInstance:FindFirstChild(classicHubs[i])
-        if folder then
-            local children = folder:GetChildren()
-            for j = 1, #children do
-                local child = children[j]
-                if string.find(string.lower(child.Name), lowerTarget) and string.find(child.ClassName, "Value") then
-                    return child
-                end
-            end
+    if _G.TrackerCore then _G.TrackerCore = nil end
+    _G.TrackerCore = {
+        Config = {
+            Stats = {"Strength", "Endurance", "Rebirths", "Gold", "Kills", "KillStreak", "Lifts", "BossTime", "Spins"},
+            Suffixes = {"K", "M", "B", "T", "QA", "QI", "SX", "SP"}
+        },
+        SpyState = { target = nil, startTime = os.time(), labels = {}, start = {}, total = {}, last = {}, rate = {}, ticks = {} },
+        Utils = {}
+    }
+
+    local Core = _G.TrackerCore
+
+    Core.Utils.updateLabelText = function(label, content)
+        if not label then return end
+        local ok = pcall(function() label.Text = content end)
+        if not ok then ok = pcall(function() label:SetText(content) end) end
+        if not ok then pcall(function() label:UpdateLabel(content) end) end
+    end
+
+    Core.Utils.formatNumber = function(value)
+        if not value or typeof(value) ~= "number" then return "0" end
+        local absVal = math.abs(value)
+        if absVal < 1000 then 
+            return tostring(value < 0 and -math.floor(absVal) or math.floor(absVal)) 
         end
+        local index = math.floor(math.log10(absVal) / 3)
+        if index > #Core.Config.Suffixes then index = #Core.Config.Suffixes end
+        return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. (Core.Config.Suffixes[index] or "")
     end
 
-    local rootChildren = playerInstance:GetChildren()
-    for i = 1, #rootChildren do
-        local child = rootChildren[i]
-        if string.find(string.lower(child.Name), lowerTarget) and string.find(child.ClassName, "Value") then
-            return child
-        elseif child:IsA("Folder") or child:IsA("Configuration") then
-            local subChildren = child:GetChildren()
-            for j = 1, #subChildren do
-                local subChild = subChildren[j]
-                if string.find(string.lower(subChild.Name), lowerTarget) and string.find(subChild.ClassName, "Value") then
-                    return subChild
-                end
-            end
-        end
-    end
-    return nil
-end
-
----------------------------------------------------------
--- [SECTION 2: SPY PLAYER INTERFACE FIELDS]
----------------------------------------------------------
-local SpyTab = nil
-pcall(function() SpyTab = window:AddTab("Spy Stats Player 👁️") end)
-
-local PlayerDropdown = SpyTab and SpyTab:AddDropdown("Select Player...", function(selectedName)
-    local S = Core.SpyState
-    if selectedName == "None" or selectedName == "" then
-        S.target, S.start, S.total, S.last, S.rate, S.ticks = nil, {}, {}, {}, {}, {}
-        return
-    end
-    local found = Players:FindFirstChild(selectedName)
-    if found then
-        S.target, S.startTime, S.start, S.total, S.last, S.rate, S.ticks = found, os.time(), {}, {}, {}, {}, {}
-        local curT = os.time()
-        for _, name in ipairs(Core.Config.Stats) do
-            local obj = Core.Utils.locatePlayerStatObject(found, name)
-            local val = obj and tonumber(obj.Value) or 0
-            S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = val, val, 0, curT, 0
-        end
-    else
-        S.target = nil
-    end
-end) or nil
-
-local function refreshDropdownOptions()
-    if not PlayerDropdown then return end
-    pcall(function() PlayerDropdown:Clear() end) 
-    pcall(function() PlayerDropdown:Add("None") end)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then pcall(function() PlayerDropdown:Add(p.Name) end) end
-    end
-end
-
-refreshDropdownOptions()
-Players.PlayerAdded:Connect(refreshDropdownOptions)
-Players.PlayerRemoving:Connect(function(p)
-    if Core.SpyState.target == p then
-        Core.SpyState.target, Core.SpyState.start, Core.SpyState.total, Core.SpyState.last, Core.SpyState.rate, Core.SpyState.ticks = nil, {}, {}, {}, {}, {}
-    end
-    refreshDropdownOptions()
-end)
-
-for _, name in ipairs(Core.Config.Stats) do
-    pcall(function() Core.SpyState.labels[name] = SpyTab:AddLabel(name .. ": N/A") end)
-end
-
----------------------------------------------------------
--- [SECTION 3: UNIFIED POLLED CALCULATION LOOP ENGINE]
----------------------------------------------------------
-task.spawn(function()
-    while task.wait(0.5) do
-        local currentTime = os.time()
-        local S = Core.SpyState
+    Core.Utils.locatePlayerStatObject = function(playerInstance, statName)
+        if not playerInstance then return nil end
+        local lowerTarget = string.lower(statName)
+        local classicHubs = {"leaderstats", "leaderstats2", "Stats", "PlayerData", "Data", "Currency"}
         
-        if S.target and S.target.Parent == Players then
-            for _, name in ipairs(Core.Config.Stats) do
-                local statObj = Core.Utils.locatePlayerStatObject(S.target, name)
-                if statObj and S.labels[name] then
-                    local currentVal = tonumber(statObj.Value) or 0
-                    if not S.start[name] then
-                        S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = currentVal, currentVal, 0, currentTime, 0
-                    end
-
-                    if currentVal < S.last[name] then
-                        S.total[name] = S.total[name] + math.max(S.last[name] - S.start[name], 0)
-                        S.start[name] = currentVal
-                    end
-
-                    local diff = currentVal - S.last[name]
-                    if diff > 0 then
-                        S.rate[name] = diff / math.max(currentTime - S.ticks[name], 1)
-                        S.ticks[name] = currentTime
-                    else
-                        if currentTime - (S.ticks[name] or currentTime) > 6 then
-                            S.rate[name] = math.max((S.rate[name] or 0) * 0.8, 0)
-                            if S.rate[name] < 0.1 then S.rate[name] = 0 end
-                        end
-                    end
-                    S.last[name] = currentVal
-
-                    local gained = S.total[name] + math.max(currentVal - S.start[name], 0)
-                    local r = S.rate[name] or 0
-                    
-                    if gained > 0 then
-                        if r <= 0 then r = gained / math.max(currentTime - S.startTime, 1) end
-                        Core.Utils.updateLabelText(S.labels[name], string.format(
-                            "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
-                            name, Core.Utils.formatNumber(currentVal), Core.Utils.formatNumber(gained),
-                            Core.Utils.formatNumber(r * 60), Core.Utils.formatNumber(r * 3600), Core.Utils.formatNumber(r * 86400), Core.Utils.formatNumber(r * 604800)
-                        ))
-                    else
-                        Core.Utils.updateLabelText(S.labels[name], string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Core.Utils.formatNumber(currentVal)))
+        for i = 1, #classicHubs do
+            local folder = playerInstance:FindFirstChild(classicHubs[i])
+            if folder then
+                local children = folder:GetChildren()
+                for j = 1, #children do
+                    local child = children[j]
+                    if string.find(string.lower(child.Name), lowerTarget) and string.find(child.ClassName, "Value") then
+                        return child
                     end
                 end
+            end
+        end
+
+        local rootChildren = playerInstance:GetChildren()
+        for i = 1, #rootChildren do
+            local child = rootChildren[i]
+            if string.find(string.lower(child.Name), lowerTarget) and string.find(child.ClassName, "Value") then
+                return child
+            elseif child:IsA("Folder") or child:IsA("Configuration") then
+                local subChildren = child:GetChildren()
+                for j = 1, #subChildren do
+                    local subChild = subChildren[j]
+                    if string.find(string.lower(subChild.Name), lowerTarget) and string.find(subChild.ClassName, "Value") then
+                        return subChild
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    ---------------------------------------------------------
+    -- [SECTION 3: SPY PLAYER INTERFACE FIELDS]
+    ---------------------------------------------------------
+    local SpyTab = nil
+    pcall(function() SpyTab = window:AddTab("Spy Stats Player 👁️") end)
+
+    local PlayerDropdown = SpyTab and SpyTab:AddDropdown("Select Player...", function(selectedName)
+        local S = Core.SpyState
+        if selectedName == "None" or selectedName == "" then
+            S.target, S.start, S.total, S.last, S.rate, S.ticks = nil, {}, {}, {}, {}, {}
+            return
+        end
+        local found = PlayersRef:FindFirstChild(selectedName)
+        if found then
+            S.target, S.startTime, S.start, S.total, S.last, S.rate, S.ticks = found, os.time(), {}, {}, {}, {}, {}
+            local curT = os.time()
+            for _, name in ipairs(Core.Config.Stats) do
+                local obj = Core.Utils.locatePlayerStatObject(found, name)
+                local val = obj and tonumber(obj.Value) or 0
+                S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = val, val, 0, curT, 0
             end
         else
-            for _, name in ipairs(Core.Config.Stats) do
-                Core.Utils.updateLabelText(S.labels[name], name .. ": N/A (N/A) | /m: N/A | /h: N/A | /d: N/A | /w: N/A")
-            end
+            S.target = nil
+        end
+    end) or nil
+
+    local function refreshDropdownOptions()
+        if not PlayerDropdown then return end
+        pcall(function() PlayerDropdown:Clear() end) 
+        pcall(function() PlayerDropdown:Add("None") end)
+        for _, p in ipairs(PlayersRef:GetPlayers()) do
+            if p ~= LocalPlayerRef then pcall(function() PlayerDropdown:Add(p.Name) end) end
         end
     end
-end)
+
+    refreshDropdownOptions()
+    PlayersRef.PlayerAdded:Connect(refreshDropdownOptions)
+    PlayersRef.PlayerRemoving:Connect(function(p)
+        if Core.SpyState.target == p then
+            Core.SpyState.target, Core.SpyState.start, Core.SpyState.total, Core.SpyState.last, Core.SpyState.rate, Core.SpyState.ticks = nil, {}, {}, {}, {}, {}
+        end
+        refreshDropdownOptions()
+    end)
+
+    for _, name in ipairs(Core.Config.Stats) do
+        pcall(function() Core.SpyState.labels[name] = SpyTab:AddLabel(name .. ": N/A") end)
+    end
+
+    ---------------------------------------------------------
+    -- [SECTION 4: UNIFIED POLLED CALCULATION LOOP ENGINE]
+    ---------------------------------------------------------
+    task.spawn(function()
+        while task.wait(0.5) do
+            local currentTime = os.time()
+            local S = Core.SpyState
+            
+            if S.target and S.target.Parent == PlayersRef then
+                for _, name in ipairs(Core.Config.Stats) do
+                    local statObj = Core.Utils.locatePlayerStatObject(S.target, name)
+                    if statObj and S.labels[name] then
+                        local currentVal = tonumber(statObj.Value) or 0
+                        if not S.start[name] then
+                            S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = currentVal, currentVal, 0, currentTime, 0
+                        end
+
+                        if currentVal < S.last[name] then
+                            S.total[name] = S.total[name] + math.max(S.last[name] - S.start[name], 0)
+                            S.start[name] = currentVal
+                        end
+
+                        local diff = currentVal - S.last[name]
+                        if diff > 0 then
+                            S.rate[name] = diff / math.max(currentTime - S.ticks[name], 1)
+                            S.ticks[name] = currentTime
+                        else
+                            if currentTime - (S.ticks[name] or currentTime) > 6 then
+                                S.rate[name] = math.max((S.rate[name] or 0) * 0.8, 0)
+                                if S.rate[name] < 0.1 then S.rate[name] = 0 end
+                            end
+                        end
+                        S.last[name] = currentVal
+
+                        local gained = S.total[name] + math.max(currentVal - S.start[name], 0)
+                        local r = S.rate[name] or 0
+                        
+                        if gained > 0 then
+                            if r <= 0 then r = gained / math.max(currentTime - S.startTime, 1) end
+                            Core.Utils.updateLabelText(S.labels[name], string.format(
+                                "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
+                                name, Core.Utils.formatNumber(currentVal), Core.Utils.formatNumber(gained),
+                                Core.Utils.formatNumber(r * 60), Core.Utils.formatNumber(r * 3600), Core.Utils.formatNumber(r * 86400), Core.Utils.formatNumber(r * 604800)
+                            ))
+                        else
+                            Core.Utils.updateLabelText(S.labels[name], string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Core.Utils.formatContext and Core.Utils.formatNumber(currentVal) or Core.Utils.formatNumber(currentVal)))
+                        end
+                    end
+                end
+            else
+                for _, name in ipairs(Core.Config.Stats) do
+                    Core.Utils.updateLabelText(S.labels[name], name .. ": N/A (N/A) | /m: N/A | /h: N/A | /d: N/A | /w: N/A")
+                end
+            end
+        end
+    end)
+end
 
 -- [[ MOVE TO TOP: Core Logic Variables ]]
 local player = game.Players.LocalPlayer
