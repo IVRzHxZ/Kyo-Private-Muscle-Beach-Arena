@@ -28,7 +28,7 @@ task.spawn(function()
 
         local nameLower = element.Name:lower()
 
-        -- Huwag galawin ang toggles, indicators, at checkmarks para hindi masira
+        -- Huwag galawin ang mga indicators, checkmarks, at toggles para hindi masira ang default look
         if nameLower:match("indicator") or nameLower:match("checkmark") or nameLower:match("toggle") then
             return 
         end
@@ -44,11 +44,16 @@ task.spawn(function()
             end
         end
 
-        -- 2. Piliting gawing Itim ang Window at Folders, at Flame Orange ang mga Background Frames
+        -- 2. BACKGROUND FRAMES (May white-list para sa mga specific UI elements lang)
         if element:IsA("Frame") or element:IsA("TextButton") or element:IsA("TextBox") then
             if nameLower:match("window") or nameLower:match("main") or nameLower:match("folder") then
                 element.BackgroundColor3 = BLACK
-            else
+            elseif nameLower:match("addswitch") 
+                or nameLower:match("addbutton") 
+                or nameLower:match("addslider") 
+                or nameLower:match("adddropdown") 
+                or nameLower:match("addtextbox")
+                or nameLower:match("bar") then
                 element.BackgroundColor3 = FIRE_ORANGE
             end
         end
