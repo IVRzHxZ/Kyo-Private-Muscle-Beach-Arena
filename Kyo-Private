@@ -3850,10 +3850,6 @@ misc:AddButton("Stats Changer", function()
     loadstring(game:HttpGet("https://pastebin.com/raw/Lrjy9D3B"))()
 end)
 
-misc:AddButton("Hand Master R15", function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Hand-Master-r15-Anim-Edited-Becoming-Puncher-By-Leorio-208942"))()
-end)
-
 -- 4. Server Hop Function Definition
 local function serverHop()
     local HttpService = game:GetService("HttpService")
