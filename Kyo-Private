@@ -87,8 +87,8 @@ features:AddLabel("~~~~~~~~~~~~~~~~~~")
 -- Create Tab within the Window
 local FarmTab = window:AddTab("Farm")
 
-local opfarms = FarmTab:AddFolder("Equiped Equipment")
-local toos = FarmTab:AddFolder("Auto Equiped Equipment V2")
+local opfarms = FarmTab:AddFolder("Equiped Dumbbells")
+local toos = FarmTab:AddFolder("Auto Equiped Dumbbells V2")
 
 -- 3. ANTI-AFK SWITCH (Elerium v2 UI Library Edition - Non-Draggable & Extra Large Rainbow)
 local Players = game:GetService("Players")
@@ -1928,148 +1928,147 @@ end)
 -- Creating the Tab and showing it
 local MainTab = window:AddTab("Upgrade Evolutions")
 
--- Function to handle the Fastlift upgrade
-local function buyFastlift()
-    local args = {
-        [1] = "fastliftUpgrade"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
+-- Isang listahan ng lahat ng remote arguments na kailangang i-upgrade
+local upgrades = {
+    "fastliftUpgrade",
+    "healthUpgrade",
+    "damageUpgrade",
+    "gainUpgrade",
+    "petsgainUpgrade",
+    "fastPunch",
+    "stealChocolate",
+    "chestReward"
+}
 
--- Function to handle the Health upgrade
-local function buyHealth()
-    local args = {
-        [1] = "healthUpgrade"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Damage upgrade
-local function buyDamage()
-    local args = {
-        [1] = "damageUpgrade"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Gain upgrade
-local function buyGain()
-    local args = {
-        [1] = "gainUpgrade"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Pets Gain upgrade
-local function buyPetsGain()
-    local args = {
-        [1] = "petsgainUpgrade"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Fast Punch upgrade
-local function buyFastPunch()
-    local args = {
-        [1] = "fastPunch"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Steal Chocolate action
-local function stealChocolate()
-    local args = {
-        [1] = "stealChocolate"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
-
--- Function to handle the Chest Reward claim
-local function claimChest()
-    local args = {
-        [1] = "chestReward"
-    }
-    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(unpack(args))
-end
+-- Isang switch para sa lahat ng upgrades
+local autoAllActive = false
+MainTab:AddSwitch("Auto Upgrade All", function(bool)
+    autoAllActive = bool
+    if bool then
+        task.spawn(function()
+            while autoAllActive do
+                -- Iikutan lahat ng nasa listahan nang sunod-sunod
+                for _, upgradeName in ipairs(upgrades) do
+                    if not autoAllActive then break end -- Huminto agad kapag pinatay ang switch
+                    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(upgradeName)
+                    task.wait(0.1) -- Maikling patlang para hindi ma-rate limit ng server
+                end
+                task.wait(0.2) -- Break bago magsimula ulit ang susunod na round ng upgrades
+            end
+        end)
+    end
+end)
 
 -- Switch for Fastlift Upgrade
+local fastliftActive = false
 MainTab:AddSwitch("Auto Upgrade Fastlift", function(bool)
-    task.spawn(function()
-        while bool do
-            buyFastlift()
-            task.wait(1)
-        end
-    end)
+    fastliftActive = bool
+    if bool then
+        task.spawn(function()
+            while fastliftActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("fastliftUpgrade")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Health Upgrade
+local healthActive = false
 MainTab:AddSwitch("Auto Upgrade Health", function(bool)
-    task.spawn(function()
-        while bool do
-            buyHealth()
-            task.wait(1)
-        end
-    end)
+    healthActive = bool
+    if bool then
+        task.spawn(function()
+            while healthActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("healthUpgrade")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Damage Upgrade
+local damageActive = false
 MainTab:AddSwitch("Auto Upgrade Damage", function(bool)
-    task.spawn(function()
-        while bool do
-            buyDamage()
-            task.wait(1)
-        end
-    end)
+    damageActive = bool
+    if bool then
+        task.spawn(function()
+            while damageActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("damageUpgrade")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Gain Upgrade
-MainTab:AddSwitch("Auto Upgrade Gain", function(bool)
-    task.spawn(function()
-        while bool do
-            buyGain()
-            task.wait(1)
-        end
-    end)
+local gainActive = false
+MainTab:AddSwitch("Auto Upgrade Strength Gain", function(bool)
+    gainActive = bool
+    if bool then
+        task.spawn(function()
+            while gainActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("gainUpgrade")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Pets Gain Upgrade
+local petsActive = false
 MainTab:AddSwitch("Auto Upgrade Pets Gain", function(bool)
-    task.spawn(function()
-        while bool do
-            buyPetsGain()
-            task.wait(1)
-        end
-    end)
+    petsActive = bool
+    if bool then
+        task.spawn(function()
+            while petsActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("petsgainUpgrade")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Fast Punch Upgrade
+local punchActive = false
 MainTab:AddSwitch("Auto Upgrade Fast Punch", function(bool)
-    task.spawn(function()
-        while bool do
-            buyFastPunch()
-            task.wait(1)
-        end
-    end)
+    punchActive = bool
+    if bool then
+        task.spawn(function()
+            while punchActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("fastPunch")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Steal Chocolate Action
+local chocolateActive = false
 MainTab:AddSwitch("Auto Upgrade Steal Chocolate", function(bool)
-    task.spawn(function()
-        while bool do
-            stealChocolate()
-            task.wait(1)
-        end
-    end)
+    chocolateActive = bool
+    if bool then
+        task.spawn(function()
+            while chocolateActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("stealChocolate")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Switch for Chest Reward Claiming
+local chestActive = false
 MainTab:AddSwitch("Auto Upgrade Chest", function(bool)
-    task.spawn(function()
-        while bool do
-            claimChest()
-            task.wait(1)
-        end
-    end)
+    chestActive = bool
+    if bool then
+        task.spawn(function()
+            while chestActive do
+                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("chestReward")
+                task.wait(1)
+            end
+        end)
+    end
 end)
 
 -- Create Only the Teleports Tab within the Window
