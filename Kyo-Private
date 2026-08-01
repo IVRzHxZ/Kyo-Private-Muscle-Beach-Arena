@@ -1928,6 +1928,9 @@ end)
 -- Creating the Tab and showing it
 local MainTab = window:AddTab("Upgrade Evolutions")
 
+-- Remote service caching to save memory and execution speed
+local upgradeRemote = game:GetService("ReplicatedStorage").remotes.upgradeEvolution
+
 -- Isang listahan ng lahat ng remote arguments na kailangang i-upgrade
 local upgrades = {
     "fastliftUpgrade",
@@ -1940,17 +1943,29 @@ local upgrades = {
     "chestReward"
 }
 
+-- Isang table para hawakan ang toggle states (Saves local registers!)
+local states = {
+    autoAll = false,
+    fastliftUpgrade = false,
+    healthUpgrade = false,
+    damageUpgrade = false,
+    gainUpgrade = false,
+    petsgainUpgrade = false,
+    fastPunch = false,
+    stealChocolate = false,
+    chestReward = false
+}
+
 -- Isang switch para sa lahat ng upgrades
-local autoAllActive = false
 MainTab:AddSwitch("Auto Upgrade All", function(bool)
-    autoAllActive = bool
+    states.autoAll = bool
     if bool then
         task.spawn(function()
-            while autoAllActive do
+            while states.autoAll do
                 -- Iikutan lahat ng nasa listahan nang sunod-sunod
                 for _, upgradeName in ipairs(upgrades) do
-                    if not autoAllActive then break end -- Huminto agad kapag pinatay ang switch
-                    game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer(upgradeName)
+                    if not states.autoAll then break end -- Huminto agad kapag pinatay ang switch
+                    upgradeRemote:FireServer(upgradeName)
                     task.wait(0.1) -- Maikling patlang para hindi ma-rate limit ng server
                 end
                 task.wait(0.2) -- Break bago magsimula ulit ang susunod na round ng upgrades
@@ -1960,13 +1975,12 @@ MainTab:AddSwitch("Auto Upgrade All", function(bool)
 end)
 
 -- Switch for Fastlift Upgrade
-local fastliftActive = false
 MainTab:AddSwitch("Auto Upgrade Fastlift", function(bool)
-    fastliftActive = bool
+    states.fastliftUpgrade = bool
     if bool then
         task.spawn(function()
-            while fastliftActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("fastliftUpgrade")
+            while states.fastliftUpgrade do
+                upgradeRemote:FireServer("fastliftUpgrade")
                 task.wait(1)
             end
         end)
@@ -1974,13 +1988,12 @@ MainTab:AddSwitch("Auto Upgrade Fastlift", function(bool)
 end)
 
 -- Switch for Health Upgrade
-local healthActive = false
 MainTab:AddSwitch("Auto Upgrade Health", function(bool)
-    healthActive = bool
+    states.healthUpgrade = bool
     if bool then
         task.spawn(function()
-            while healthActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("healthUpgrade")
+            while states.healthUpgrade do
+                upgradeRemote:FireServer("healthUpgrade")
                 task.wait(1)
             end
         end)
@@ -1988,13 +2001,12 @@ MainTab:AddSwitch("Auto Upgrade Health", function(bool)
 end)
 
 -- Switch for Damage Upgrade
-local damageActive = false
 MainTab:AddSwitch("Auto Upgrade Damage", function(bool)
-    damageActive = bool
+    states.damageUpgrade = bool
     if bool then
         task.spawn(function()
-            while damageActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("damageUpgrade")
+            while states.damageUpgrade do
+                upgradeRemote:FireServer("damageUpgrade")
                 task.wait(1)
             end
         end)
@@ -2002,13 +2014,12 @@ MainTab:AddSwitch("Auto Upgrade Damage", function(bool)
 end)
 
 -- Switch for Gain Upgrade
-local gainActive = false
 MainTab:AddSwitch("Auto Upgrade Strength Gain", function(bool)
-    gainActive = bool
+    states.gainUpgrade = bool
     if bool then
         task.spawn(function()
-            while gainActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("gainUpgrade")
+            while states.gainUpgrade do
+                upgradeRemote:FireServer("gainUpgrade")
                 task.wait(1)
             end
         end)
@@ -2016,13 +2027,12 @@ MainTab:AddSwitch("Auto Upgrade Strength Gain", function(bool)
 end)
 
 -- Switch for Pets Gain Upgrade
-local petsActive = false
 MainTab:AddSwitch("Auto Upgrade Pets Gain", function(bool)
-    petsActive = bool
+    states.petsgainUpgrade = bool
     if bool then
         task.spawn(function()
-            while petsActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("petsgainUpgrade")
+            while states.petsgainUpgrade do
+                upgradeRemote:FireServer("petsgainUpgrade")
                 task.wait(1)
             end
         end)
@@ -2030,13 +2040,12 @@ MainTab:AddSwitch("Auto Upgrade Pets Gain", function(bool)
 end)
 
 -- Switch for Fast Punch Upgrade
-local punchActive = false
 MainTab:AddSwitch("Auto Upgrade Fast Punch", function(bool)
-    punchActive = bool
+    states.fastPunch = bool
     if bool then
         task.spawn(function()
-            while punchActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("fastPunch")
+            while states.fastPunch do
+                upgradeRemote:FireServer("fastPunch")
                 task.wait(1)
             end
         end)
@@ -2044,13 +2053,12 @@ MainTab:AddSwitch("Auto Upgrade Fast Punch", function(bool)
 end)
 
 -- Switch for Steal Chocolate Action
-local chocolateActive = false
 MainTab:AddSwitch("Auto Upgrade Steal Chocolate", function(bool)
-    chocolateActive = bool
+    states.stealChocolate = bool
     if bool then
         task.spawn(function()
-            while chocolateActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("stealChocolate")
+            while states.stealChocolate do
+                upgradeRemote:FireServer("stealChocolate")
                 task.wait(1)
             end
         end)
@@ -2058,13 +2066,12 @@ MainTab:AddSwitch("Auto Upgrade Steal Chocolate", function(bool)
 end)
 
 -- Switch for Chest Reward Claiming
-local chestActive = false
 MainTab:AddSwitch("Auto Upgrade Chest", function(bool)
-    chestActive = bool
+    states.chestReward = bool
     if bool then
         task.spawn(function()
-            while chestActive do
-                game:GetService("ReplicatedStorage").remotes.upgradeEvolution:FireServer("chestReward")
+            while states.chestReward do
+                upgradeRemote:FireServer("chestReward")
                 task.wait(1)
             end
         end)
