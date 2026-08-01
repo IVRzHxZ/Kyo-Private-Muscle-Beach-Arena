@@ -819,6 +819,14 @@ opfarms:AddButton("Equiped Push Ups 40kg", function()
     game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
 end)
 
+-- Button 4: Use Push Ups
+opfarms:AddButton("Equiped Push Ups 75kg", function()
+    local args = {
+        [1] = "Push Ups Legend"
+    }
+    game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
+end)
+
 opfarms:AddLabel("Dumbbell")
 
 -- Create the Button using Elerium V2 syntax (:AddButton)
@@ -869,6 +877,14 @@ opfarms:AddButton("Equiped Dumbbell Curl 40kg", function()
     game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
 end)
 
+-- Button 2: Use Dumbbell Curl
+opfarms:AddButton("Equiped Dumbbell Curl 75kg", function()
+    local args = {
+        [1] = "Dumbbell Curl Legend"
+    }
+    game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
+end)
+
 opfarms:AddLabel("Dead lift")
 
 -- Button 3: Use Dead Lift
@@ -907,6 +923,14 @@ end)
 opfarms:AddButton("Equiped Dead Lift 40kg", function()
     local args = {
         [1] = "Dead Lift Magma"
+    }
+    game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
+end)
+
+-- Button 3: Use Dead Lift
+opfarms:AddButton("Equiped Dead Lift 75kg", function()
+    local args = {
+        [1] = "Dead Lift Legend"
     }
     game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
 end)
@@ -953,6 +977,14 @@ opfarms:AddButton("Equiped Squat 40kg", function()
     game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
 end)
 
+-- Button 1: Use Squat
+opfarms:AddButton("Equiped Squat 75kg", function()
+    local args = {
+        [1] = "Squat Legend"
+    }
+    game:GetService("ReplicatedStorage").remotes.dumbbellTake:FireServer(unpack(args))
+end)
+
 local remotes = game:GetService("ReplicatedStorage").remotes
 
 -- Push ups Toggles
@@ -994,6 +1026,14 @@ toos:AddSwitch("Auto Equiped Push Ups 40kg", function(state)
     end
 end)
 
+local farmingPushUps40 = false
+toos:AddSwitch("Auto Equiped Push Ups 75kg", function(state)
+    farmingPushUps40 = state
+    while farmingPushUps40 do
+        remotes.dumbbellTake:FireServer("Push Ups Legend")
+        task.wait(6)
+    end
+end)
 
 -- Dumbbell Toggles
 toos:AddLabel("Dumbbell")
@@ -1052,6 +1092,14 @@ toos:AddSwitch("Auto Equiped Dumbbell Curl 40kg", function(state)
     end
 end)
 
+local farmingCurl40 = false
+toos:AddSwitch("Auto Equiped Dumbbell Curl 75kg", function(state)
+    farmingCurl40 = state
+    while farmingCurl40 do
+        remotes.dumbbellTake:FireServer("Dumbbell Curl Legend")
+        task.wait(6)
+    end
+end)
 
 -- Dead lift Toggles
 toos:AddLabel("Dead lift")
@@ -1101,6 +1149,14 @@ toos:AddSwitch("Auto Equiped Dead Lift 40kg", function(state)
     end
 end)
 
+local farmingDeadLift40 = false
+toos:AddSwitch("Auto Equiped Dead Lift 75kg", function(state)
+    farmingDeadLift40 = state
+    while farmingDeadLift40 do
+        remotes.dumbbellTake:FireServer("Dead Lift Legend")
+        task.wait(6)
+    end
+end)
 
 -- Squat Toggles
 toos:AddLabel("Squat")
@@ -1146,6 +1202,15 @@ toos:AddSwitch("Auto Equiped Squat 40kg", function(state)
     farmingSquat40 = state
     while farmingSquat40 do
         remotes.dumbbellTake:FireServer("Squat Magma")
+        task.wait(6)
+    end
+end)
+
+local farmingSquat40 = false
+toos:AddSwitch("Auto Equiped Squat 75kg", function(state)
+    farmingSquat40 = state
+    while farmingSquat40 do
+        remotes.dumbbellTake:FireServer("Squat Legend")
         task.wait(6)
     end
 end)
@@ -2057,6 +2122,12 @@ TeleportTab:AddButton("Volcano World", function()
         -0.999657333, -4.12707273e-08, 0.0261769108, 
         -4.18838546e-08, 1, -2.28741524e-08, 
         -0.0261769108, -2.39627038e-08, -0.999657333
+    ))
+end)
+
+TeleportTab:AddButton("Dumbbells World", function()
+    teleportTo(CFrame.new(
+        -1740.26685, 11.3567324, 368.174683, -1.19210611e-07, -4.05949896e-09, 1, 1.13882492e-09, 1, 4.05949896e-09, -1, 1.13882537e-09, -1.19210611e-07
     ))
 end)
 
