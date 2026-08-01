@@ -1183,6 +1183,7 @@ petDropdown:Add("uncommon")
 petDropdown:Add("rare")
 petDropdown:Add("epic")
 petDropdown:Add("mythic")
+petDropdown:Add("master")
 
 -- Switch to toggle the actual auto-buyer loop
 eggtab:AddSwitch("Auto Buy Selected Egg", function(bool)
@@ -1747,6 +1748,104 @@ end
 
 -- Using AddSwitch directly without external state variable or :Set()
 autosell:AddSwitch("Auto Sell Space Dragon", function(bool)
+    -- Loop runs on a separate thread when switched on
+    task.spawn(function()
+        while bool do
+            sellPet()
+            task.wait(1) -- 1-second delay to protect against network rate-limits
+        end
+    end)
+end)
+
+autosell:AddLabel("Master Egg")
+
+-- Function to handle the remote safely
+local function sellPet()
+    local player = game:GetService("Players").LocalPlayer
+    local petsFolder = player:FindFirstChild("PetsFolder")
+    
+    if petsFolder and petsFolder:FindFirstChild("Red Alien") then
+        local args = {
+            [1] = petsFolder["Red Alien"]
+        }
+        game:GetService("ReplicatedStorage").remotes.sellRequest:FireServer(unpack(args))
+    end
+end
+
+-- Using AddSwitch directly without external state variable or :Set()
+autosell:AddSwitch("Auto Sell Red Alien", function(bool)
+    -- Loop runs on a separate thread when switched on
+    task.spawn(function()
+        while bool do
+            sellPet()
+            task.wait(1) -- 1-second delay to protect against network rate-limits
+        end
+    end)
+end)
+
+-- Function to handle the remote safely
+local function sellPet()
+    local player = game:GetService("Players").LocalPlayer
+    local petsFolder = player:FindFirstChild("PetsFolder")
+    
+    if petsFolder and petsFolder:FindFirstChild("Fire Alien") then
+        local args = {
+            [1] = petsFolder["Fire Alien"]
+        }
+        game:GetService("ReplicatedStorage").remotes.sellRequest:FireServer(unpack(args))
+    end
+end
+
+-- Using AddSwitch directly without external state variable or :Set()
+autosell:AddSwitch("Auto Sell Fire Alien", function(bool)
+    -- Loop runs on a separate thread when switched on
+    task.spawn(function()
+        while bool do
+            sellPet()
+            task.wait(1) -- 1-second delay to protect against network rate-limits
+        end
+    end)
+end)
+
+-- Function to handle the remote safely
+local function sellPet()
+    local player = game:GetService("Players").LocalPlayer
+    local petsFolder = player:FindFirstChild("PetsFolder")
+    
+    if petsFolder and petsFolder:FindFirstChild("Vortex") then
+        local args = {
+            [1] = petsFolder.Vortex
+        }
+        game:GetService("ReplicatedStorage").remotes.sellRequest:FireServer(unpack(args))
+    end
+end
+
+-- Using AddSwitch directly without external state variable or :Set()
+autosell:AddSwitch("Auto Sell Vortex", function(bool)
+    -- Loop runs on a separate thread when switched on
+    task.spawn(function()
+        while bool do
+            sellPet()
+            task.wait(1) -- 1-second delay to protect against network rate-limits
+        end
+    end)
+end)
+
+-- Function to handle the remote safely
+local function sellPet()
+    local player = game:GetService("Players").LocalPlayer
+    local petsFolder = player:FindFirstChild("PetsFolder")
+    
+    if petsFolder and petsFolder:FindFirstChild("Astrax") then
+        local args = {
+            [1] = petsFolder.Astrax
+        }
+        game:GetService("ReplicatedStorage").remotes.sellRequest:FireServer(unpack(args))
+    end
+end
+
+-- Using AddSwitch directly without external state variable or :Set()
+autosell:AddSwitch("Auto Sell Astrax", function(bool)
     -- Loop runs on a separate thread when switched on
     task.spawn(function()
         while bool do
