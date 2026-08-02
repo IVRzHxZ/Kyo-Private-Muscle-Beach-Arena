@@ -220,6 +220,65 @@ end)
 -- Visually toggle Elerium switch checkmark to ON immediately upon loading script
 AntiAFKSwitch:Set(true)
 
+-- Global state for Popups
+local _G = getgenv and getgenv() or _G
+_G.HideGainedPopups = false
+local originalStates = {}
+
+-- Checks if the UI element is any type of standard visual Frame container
+local function isFrameUi(element)
+    return element:IsA("Frame") or element:IsA("ScrollingFrame") or element:IsA("CanvasGroup")
+end
+
+local function hideElement(element)
+    if not isFrameUi(element) then return end
+    
+    -- Save original properties before modifying them
+    if not originalStates[element] then
+        originalStates[element] = {
+            Visible = element.Visible,
+            Position = element.Position
+        }
+    end
+    
+    element.Visible = false
+    element.Position = UDim2.new(5, 0, 5, 0) -- Teleport far off-screen to bypass forced visibility scripts
+end
+
+local function restoreElements()
+    for element, state in pairs(originalStates) do
+        if element and element.Parent then
+            element.Visible = state.Visible
+            element.Position = state.Position
+        end
+    end
+    table.clear(originalStates)
+end
+
+local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+-- Listen for any new frames being added dynamically while the switch is ON
+playerGui.DescendantAdded:Connect(function(descendant)
+    if _G.HideGainedPopups then
+        task.wait(0.05) -- Tiny delay to let the game engine set up the new frame first
+        if _G.HideGainedPopups then
+            hideElement(descendant)
+        end
+    end
+end)
+
+-- Hooked directly into your Elerium v2 switch
+FarmTab:AddSwitch("Hide All UI Frames", function(state)
+    _G.HideGainedPopups = state
+    if state then
+        for _, desc in ipairs(playerGui:GetDescendants()) do
+            hideElement(desc)
+        end
+    else
+        restoreElements()
+    end
+end)
+
 local isLocked = false
 local savedCFrame = nil -- Dito itatabi ang eksaktong lokasyon mo
 local player = game:GetService("Players").LocalPlayer
