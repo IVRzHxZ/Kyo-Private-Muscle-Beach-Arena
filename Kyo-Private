@@ -3432,11 +3432,11 @@ local function resetCamera()
 end
 
 -- ============================================================================
--- SPECTATE TRACKING ENGINE (SPY TARGET - PERSISTENT DEATH TRACKING)
+-- SPECTATE TRACKING ENGINE (EXACT SPY TARGET BEHAVIOR FOR BOTH)
 -- ============================================================================
 task.spawn(function()
     while true do
-        -- Single Target Spectate
+        -- Single Target Spectate (Spy Target)
         if _G.SpectateTargetActive and _G.SingleTargetName ~= "" then
             local searchString = _G.SingleTargetName:lower()
             local targetFound = false
@@ -3464,21 +3464,24 @@ task.spawn(function()
             if not targetFound then
                 resetCamera()
             end
-        -- Target Kill List Spectate
+            
+        -- Target Kill List Spectate (Spy Target List - Following exact Spy Target logic per player)
         elseif _G.SpectateTargetListActive and #_G.targetKillListTable > 0 then
             local targetFound = false
             for _, player in ipairs(_G.PlayersService:GetPlayers()) do
                 if player ~= _G.MyLocalPlayer and isPlayerOnTargetList(player) then
-                    if isAliveAndValid(player) then
-                        targetFound = true
+                    targetFound = true
+                    if player.Character then
                         local hum = player.Character:FindFirstChildOfClass("Humanoid")
                         if hum then
                             Camera.CameraSubject = hum
                         else
                             Camera.CameraSubject = player.Character
                         end
-                        break
+                    else
+                        Camera.CameraSubject = player
                     end
+                    break
                 end
             end
             if not targetFound then
@@ -3530,7 +3533,24 @@ task.spawn(function()
                         if _G.autokillall2 then
                             if not _G.activeThreads[player.UserId] then
                                 _G.activeThreads[player.UserId] = true
-                                task.spawn(function() teleportToMe(player, _G.MyLocalPlayer); task.wait(0.1); _G.activeThreads[player.UserId] = nil end)
+                                
+                                local startTime = tick()
+                                while tick() - startTime < 1 do
+                                    if not _G.autokillall2 or not isAliveAndValid(player) then break end
+                                    teleportToMe(player, _G.MyLocalPlayer)
+                                    
+                                    local activeChar = _G.MyLocalPlayer.Character
+                                    if activeChar then
+                                        local activeTool = activeChar:FindFirstChild("Punch")
+                                        if activeTool then
+                                            activeTool:Activate()
+                                        end
+                                    end
+                                    
+                                    task.wait(0.05)
+                                end
+                                
+                                _G.activeThreads[player.UserId] = nil
                             end
                         else
                             teleportToMe(player, _G.MyLocalPlayer)
