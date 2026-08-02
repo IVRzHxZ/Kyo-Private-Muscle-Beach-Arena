@@ -3338,6 +3338,8 @@ function teleportToMe(targetPlayer, targetLocalPlayer)
     local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
     local myRoot = targetLocalPlayer.Character and (targetLocalPlayer.Character:FindFirstChild("HumanoidRootPart") or targetLocalPlayer.Character:FindFirstChild("Torso"))
     if not targetRoot or not myRoot then return end
+    
+    -- Target is offset precisely 3 studs in front of local player
     pcall(function() targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3) end)
 end
 
@@ -3403,7 +3405,7 @@ task.spawn(function()
             if not targetFound then
                 resetCamera()
             end
-        -- Target Kill List Spectate (Cycles through active/alive players in the target list)
+        -- Target Kill List Spectate
         elseif _G.SpectateTargetListActive and #_G.targetKillListTable > 0 then
             local targetFound = false
             for _, player in ipairs(_G.PlayersService:GetPlayers()) do
@@ -3483,19 +3485,17 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- UI COMPONENTS (ELERIUM V2 INTEGRATED WITH SMART WHITELIST & TARGET LIST)
+-- UI COMPONENTS
 -- ============================================================================
 Tab:AddSwitch("Auto Kill All", function(state) _G.autokillall = state end)
 Tab:AddSwitch("Auto Kill All V2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
 
--- Target Input Field
 Tab:AddTextBox("Target Player Auto Kill Target", function(text)
     _G.SingleTargetName = text
 end, {["clear"] = false})
 
 Tab:AddSwitch("Auto Kill Target", function(state) _G.autokilltarget = state end)
 
--- Fixed Spy Target Switch Toggle (No more forced loops when disabled)
 Tab:AddSwitch("Spy Target", function(state) 
     _G.SpectateTargetActive = state 
     if not state then 
@@ -3505,7 +3505,6 @@ end)
 
 Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
--- Target Kill List UI Components
 Tab:AddTextBox("Target Player Kill List", function(text)
     _G.targetKillInputTextCache = text
 end, {["clear"] = false})
@@ -3551,7 +3550,6 @@ end)
 
 Tab:AddSwitch("Auto Kill Target List", function(state) _G.autokilltargetlist = state end)
 
--- Spy Target List Switch Toggle
 Tab:AddSwitch("Spy Target List", function(state) 
     _G.SpectateTargetListActive = state 
     if not state then 
@@ -3561,12 +3559,10 @@ end)
 
 Tab:AddSwitch("Whitelist Friends", function(state) _G.FriendsWhitelistActive = state; if state then updateFriendsCache() else table.clear(_G.friendsCache) end end)
 
--- Whitelist Input Field
 Tab:AddTextBox("Type Player Name To Whitelist", function(text)
     _G.whitelistInputTextCache = text
 end, {["clear"] = false})
 
--- SMART NICKNAME / USERNAME DETECTOR EXTENSION BUTTON
 Tab:AddButton("Add Whitelist Player", function()
     if _G.whitelistInputTextCache and _G.whitelistInputTextCache ~= "" then
         local searchInput = _G.whitelistInputTextCache:lower():gsub("%s+", "")
