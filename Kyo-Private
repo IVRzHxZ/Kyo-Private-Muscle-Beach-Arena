@@ -2266,30 +2266,23 @@ _G.LocalTracker = {
     Utils = {}
 }
 
-local Tracker = _G.LocalTracker
-
-local TrackerTab = nil
-pcall(function() TrackerTab = window:AddTab("Stats 📊") end)
-
-local ClockLabel = TrackerTab:AddLabel("Session Time: 00:00:00")
-
-Tracker.Utils.updateLabelText = function(name, content)
-    local label = Tracker.Labels[name]
+_G.LocalTracker.Utils.updateLabelText = function(name, content)
+    local label = _G.LocalTracker.Labels[name]
     if not label then return end
     local ok = pcall(function() label.Text = content end)
     if not ok then ok = pcall(function() label:SetText(content) end) end
     if not ok then pcall(function() label:UpdateLabel(content) end) end
 end
 
-Tracker.Utils.formatNumber = function(value)
+_G.LocalTracker.Utils.formatNumber = function(value)
     if not value or typeof(value) ~= "number" then return "0" end
     if value < 1000 then return tostring(math.floor(value)) end
     local index = math.floor(math.log10(value) / 3)
-    local suffix = Tracker.Config.Suffixes[index] or ""
+    local suffix = _G.LocalTracker.Config.Suffixes[index] or ""
     return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. suffix
 end
 
-Tracker.Utils.scanForStatFast = function(statName)
+_G.LocalTracker.Utils.scanForStatFast = function(statName)
     if not LocalPlayer then return nil end
     local lowerTarget = string.lower(statName)
     
@@ -2326,116 +2319,129 @@ Tracker.Utils.scanForStatFast = function(statName)
     return nil
 end
 
-Tracker.Utils.computeAndRenderStat = function(name, currentVal)
+_G.LocalTracker.Utils.computeAndRenderStat = function(name, currentVal)
     local currentTime = os.time()
-    local startVal = Tracker.StartStats[name]
+    local startVal = _G.LocalTracker.StartStats[name]
     
     if not startVal then
-        Tracker.StartStats[name] = currentVal
+        _G.LocalTracker.StartStats[name] = currentVal
         startVal = currentVal
-        Tracker.TotalGained[name] = 0
-        Tracker.LastValues[name] = currentVal
-        Tracker.LastUpdates[name] = currentTime
-        Tracker.Rates[name] = 0
+        _G.LocalTracker.TotalGained[name] = 0
+        _G.LocalTracker.LastValues[name] = currentVal
+        _G.LocalTracker.LastUpdates[name] = currentTime
+        _G.LocalTracker.Rates[name] = 0
     end
     
-    if not Tracker.TotalGained[name] then Tracker.TotalGained[name] = 0 end
-    if not Tracker.LastValues[name] then Tracker.LastValues[name] = currentVal end
-    if not Tracker.LastUpdates[name] then Tracker.LastUpdates[name] = currentTime end
-    if not Tracker.Rates[name] then Tracker.Rates[name] = 0 end
+    _G.LocalTracker.TotalGained[name] = _G.LocalTracker.TotalGained[name] or 0
+    _G.LocalTracker.LastValues[name] = _G.LocalTracker.LastValues[name] or currentVal
+    _G.LocalTracker.LastUpdates[name] = _G.LocalTracker.LastUpdates[name] or currentTime
+    _G.LocalTracker.Rates[name] = _G.LocalTracker.Rates[name] or 0
 
-    if currentVal < Tracker.LastValues[name] then
-        local progressBeforeReset = math.max(Tracker.LastValues[name] - startVal, 0)
-        Tracker.TotalGained[name] = Tracker.TotalGained[name] + progressBeforeReset
-        Tracker.StartStats[name] = currentVal
+    if currentVal < _G.LocalTracker.LastValues[name] then
+        local progressBeforeReset = math.max(_G.LocalTracker.LastValues[name] - startVal, 0)
+        _G.LocalTracker.TotalGained[name] = _G.LocalTracker.TotalGained[name] + progressBeforeReset
+        _G.LocalTracker.StartStats[name] = currentVal
         startVal = currentVal
     end
 
-    local diff = currentVal - Tracker.LastValues[name]
+    local diff = currentVal - _G.LocalTracker.LastValues[name]
     if diff > 0 then
-        local timePassed = math.max(currentTime - Tracker.LastUpdates[name], 1)
-        Tracker.Rates[name] = diff / timePassed
-        Tracker.LastUpdates[name] = currentTime
+        local timePassed = math.max(currentTime - _G.LocalTracker.LastUpdates[name], 1)
+        _G.LocalTracker.Rates[name] = diff / timePassed
+        _G.LocalTracker.LastUpdates[name] = currentTime
     end
     
-    Tracker.LastValues[name] = currentVal
+    _G.LocalTracker.LastValues[name] = currentVal
 
     local currentGain = math.max(currentVal - startVal, 0)
-    local gained = Tracker.TotalGained[name] + currentGain
-    local formattedCurrent = Tracker.Utils.formatNumber(currentVal)
-    local activeRate = Tracker.Rates[name] or 0
+    local gained = _G.LocalTracker.TotalGained[name] + currentGain
+    local formattedCurrent = _G.LocalTracker.Utils.formatNumber(currentVal)
+    local activeRate = _G.LocalTracker.Rates[name] or 0
     
     if gained > 0 and activeRate > 0 then
-        Tracker.Utils.updateLabelText(name, string.format(
-            "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
-            name, formattedCurrent, Tracker.Utils.formatNumber(gained),
-            Tracker.Utils.formatNumber(activeRate * 60), Tracker.Utils.formatNumber(activeRate * 3600), 
-            Tracker.Utils.formatNumber(activeRate * 86400), Tracker.Utils.formatNumber(activeRate * 604800)
+        _G.LocalTracker.Utils.updateLabelText(name, string.format(
+            "%s: %s (+%s) | /M: %s | /H: %s | /D: %s | /W: %s | /MO: %s",
+            name, formattedCurrent, _G.LocalTracker.Utils.formatNumber(gained),
+            _G.LocalTracker.Utils.formatNumber(activeRate * 60), 
+            _G.LocalTracker.Utils.formatNumber(activeRate * 3600), 
+            _G.LocalTracker.Utils.formatNumber(activeRate * 86400), 
+            _G.LocalTracker.Utils.formatNumber(activeRate * 604800),
+            _G.LocalTracker.Utils.formatNumber(activeRate * 2592000)
         ))
     else
-        Tracker.Utils.updateLabelText(name, string.format("%s: %s (+%s) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, formattedCurrent, Tracker.Utils.formatNumber(gained)))
+        _G.LocalTracker.Utils.updateLabelText(name, string.format("%s: %s (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0", name, formattedCurrent))
     end
 end
 
-Tracker.Utils.bindObjectSignals = function(name, obj)
-    Tracker.CachedObjects[name] = obj
-    Tracker.StartStats[name] = tonumber(obj.Value) or 0
-    Tracker.LastValues[name] = tonumber(obj.Value) or 0
-    Tracker.TotalGained[name] = Tracker.TotalGained[name] or 0
-    Tracker.LastUpdates[name] = os.time()
-    Tracker.Rates[name] = 0
+_G.LocalTracker.Utils.bindObjectSignals = function(name, obj)
+    _G.LocalTracker.CachedObjects[name] = obj
+    _G.LocalTracker.StartStats[name] = tonumber(obj.Value) or 0
+    _G.LocalTracker.LastValues[name] = tonumber(obj.Value) or 0
+    _G.LocalTracker.TotalGained[name] = _G.LocalTracker.TotalGained[name] or 0
+    _G.LocalTracker.LastUpdates[name] = os.time()
+    _G.LocalTracker.Rates[name] = 0
     
-    if Tracker.Connections[name] then
-        pcall(function() Tracker.Connections[name]:Disconnect() end)
+    if _G.LocalTracker.Connections[name] then
+        pcall(function() _G.LocalTracker.Connections[name]:Disconnect() end)
     end
     
-    Tracker.Connections[name] = obj.Changed:Connect(function(newVal)
-        Tracker.Utils.computeAndRenderStat(name, tonumber(newVal) or 0)
+    _G.LocalTracker.Connections[name] = obj.Changed:Connect(function(newVal)
+        _G.LocalTracker.Utils.computeAndRenderStat(name, tonumber(newVal) or 0)
     end)
     
-    Tracker.Utils.computeAndRenderStat(name, Tracker.StartStats[name])
+    _G.LocalTracker.Utils.computeAndRenderStat(name, _G.LocalTracker.StartStats[name])
 end
 
-for i = 1, #Tracker.Config.Stats do
-    local name = Tracker.Config.Stats[i]
-    Tracker.StartStats[name] = 0
+_G.LocalTracker.TrackerTab = nil
+pcall(function() _G.LocalTracker.TrackerTab = window:AddTab("Stats 📊") end)
+
+_G.LocalTracker.ClockLabel = _G.LocalTracker.TrackerTab and _G.LocalTracker.TrackerTab:AddLabel("Session Time: 00:00:00") or nil
+
+for i = 1, #_G.LocalTracker.Config.Stats do
+    local name = _G.LocalTracker.Config.Stats[i]
+    _G.LocalTracker.StartStats[name] = 0
     
-    local foundObj = Tracker.Utils.scanForStatFast(name)
-    local currentText = name .. ": 0 (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0"
+    local foundObj = _G.LocalTracker.Utils.scanForStatFast(name)
+    local currentText = name .. ": 0 (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0"
     
     if foundObj then
         local initialVal = tonumber(foundObj.Value) or 0
-        Tracker.StartStats[name] = initialVal
-        Tracker.LastValues[name] = initialVal
-        currentText = string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Tracker.Utils.formatNumber(initialVal))
+        _G.LocalTracker.StartStats[name] = initialVal
+        _G.LocalTracker.LastValues[name] = initialVal
+        currentText = string.format("%s: %s (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0", name, _G.LocalTracker.Utils.formatNumber(initialVal))
     end
     
-    pcall(function() Tracker.Labels[name] = TrackerTab:AddLabel(currentText) end)
+    if _G.LocalTracker.TrackerTab then
+        pcall(function() _G.LocalTracker.Labels[name] = _G.LocalTracker.TrackerTab:AddLabel(currentText) end)
+    end
     
     if foundObj then
-        Tracker.Utils.bindObjectSignals(name, foundObj)
+        _G.LocalTracker.Utils.bindObjectSignals(name, foundObj)
     end
 end
 
 task.spawn(function()
     while task.wait(1) do
-        local elapsedSeconds = math.max(os.time() - Tracker.StartTime, 1)
+        local elapsedSeconds = math.max(os.time() - _G.LocalTracker.StartTime, 1)
         local currentTime = os.time()
         
         local hours = math.floor(elapsedSeconds / 3600)
         local minutes = math.floor((elapsedSeconds % 3600) / 60)
         local seconds = elapsedSeconds % 60
-        pcall(function() ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds) end)
+        if _G.LocalTracker.ClockLabel then
+            pcall(function() _G.LocalTracker.ClockLabel.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds) end)
+        end
         
-        for i = 1, #Tracker.Config.Stats do
-            local name = Tracker.Config.Stats[i]
-            local obj = Tracker.CachedObjects[name]
+        for i = 1, #_G.LocalTracker.Config.Stats do
+            local name = _G.LocalTracker.Config.Stats[i]
+            local obj = _G.LocalTracker.CachedObjects[name]
             if obj then
-                local lastActive = Tracker.LastUpdates[name] or currentTime
-                if currentTime - lastActive > 4 then
-                    Tracker.Rates[name] = math.max((Tracker.Rates[name] or 0) * 0.75, 0)
-                    if Tracker.Rates[name] < 0.1 then Tracker.Rates[name] = 0 end
-                    Tracker.Utils.computeAndRenderStat(name, tonumber(obj.Value) or 0)
+                local lastActive = _G.LocalTracker.LastUpdates[name] or currentTime
+                -- Ginawa nating 60 seconds bago magsimulang manghina ang rate, at 0.99 ang multiplier para sobrang bagal ng pagbaba
+                if currentTime - lastActive > 60 then
+                    _G.LocalTracker.Rates[name] = math.max((_G.LocalTracker.Rates[name] or 0) * 0.99, 0)
+                    if _G.LocalTracker.Rates[name] < 0.001 then _G.LocalTracker.Rates[name] = 0 end
+                    _G.LocalTracker.Utils.computeAndRenderStat(name, tonumber(obj.Value) or 0)
                 end
             end
         end
@@ -2464,27 +2470,25 @@ do
         Utils = {}
     }
 
-    local Core = _G.TrackerCore
-
-    Core.Utils.updateLabelText = function(label, content)
+    _G.TrackerCore.Utils.updateLabelText = function(label, content)
         if not label then return end
         local ok = pcall(function() label.Text = content end)
         if not ok then ok = pcall(function() label:SetText(content) end) end
         if not ok then pcall(function() label:UpdateLabel(content) end) end
     end
 
-    Core.Utils.formatNumber = function(value)
+    _G.TrackerCore.Utils.formatNumber = function(value)
         if not value or typeof(value) ~= "number" then return "0" end
         local absVal = math.abs(value)
         if absVal < 1000 then 
             return tostring(value < 0 and -math.floor(absVal) or math.floor(absVal)) 
         end
         local index = math.floor(math.log10(absVal) / 3)
-        if index > #Core.Config.Suffixes then index = #Core.Config.Suffixes end
-        return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. (Core.Config.Suffixes[index] or "")
+        if index > #_G.TrackerCore.Config.Suffixes then index = #_G.TrackerCore.Config.Suffixes end
+        return string.format("%.1f", value / (10 ^ (index * 3))):gsub("%.0$", "") .. (_G.TrackerCore.Config.Suffixes[index] or "")
     end
 
-    Core.Utils.locatePlayerStatObject = function(playerInstance, statName)
+    _G.TrackerCore.Utils.locatePlayerStatObject = function(playerInstance, statName)
         if not playerInstance then return nil end
         local lowerTarget = string.lower(statName)
         local classicHubs = {"leaderstats", "leaderstats2", "Stats", "PlayerData", "Data", "Currency"}
@@ -2523,11 +2527,11 @@ do
     ---------------------------------------------------------
     -- [SECTION 3: SPY PLAYER INTERFACE FIELDS]
     ---------------------------------------------------------
-    local SpyTab = nil
-    pcall(function() SpyTab = window:AddTab("Spy Stats Player 👁️") end)
+    _G.TrackerCore.SpyTab = nil
+    pcall(function() _G.TrackerCore.SpyTab = window:AddTab("Spy Stats Player 👁️") end)
 
-    local PlayerDropdown = SpyTab and SpyTab:AddDropdown("Select Player...", function(selectedName)
-        local S = Core.SpyState
+    _G.TrackerCore.PlayerDropdown = _G.TrackerCore.SpyTab and _G.TrackerCore.SpyTab:AddDropdown("Select Player...", function(selectedName)
+        local S = _G.TrackerCore.SpyState
         if selectedName == "None" or selectedName == "" then
             S.target, S.start, S.total, S.last, S.rate, S.ticks = nil, {}, {}, {}, {}, {}
             return
@@ -2536,8 +2540,8 @@ do
         if found then
             S.target, S.startTime, S.start, S.total, S.last, S.rate, S.ticks = found, os.time(), {}, {}, {}, {}, {}
             local curT = os.time()
-            for _, name in ipairs(Core.Config.Stats) do
-                local obj = Core.Utils.locatePlayerStatObject(found, name)
+            for _, name in ipairs(_G.TrackerCore.Config.Stats) do
+                local obj = _G.TrackerCore.Utils.locatePlayerStatObject(found, name)
                 local val = obj and tonumber(obj.Value) or 0
                 S.start[name], S.last[name], S.total[name], S.ticks[name], S.rate[name] = val, val, 0, curT, 0
             end
@@ -2547,25 +2551,27 @@ do
     end) or nil
 
     local function refreshDropdownOptions()
-        if not PlayerDropdown then return end
-        pcall(function() PlayerDropdown:Clear() end) 
-        pcall(function() PlayerDropdown:Add("None") end)
+        if not _G.TrackerCore.PlayerDropdown then return end
+        pcall(function() _G.TrackerCore.PlayerDropdown:Clear() end) 
+        pcall(function() _G.TrackerCore.PlayerDropdown:Add("None") end)
         for _, p in ipairs(PlayersRef:GetPlayers()) do
-            if p ~= LocalPlayerRef then pcall(function() PlayerDropdown:Add(p.Name) end) end
+            if p ~= LocalPlayerRef then pcall(function() _G.TrackerCore.PlayerDropdown:Add(p.Name) end) end
         end
     end
 
     refreshDropdownOptions()
     PlayersRef.PlayerAdded:Connect(refreshDropdownOptions)
     PlayersRef.PlayerRemoving:Connect(function(p)
-        if Core.SpyState.target == p then
-            Core.SpyState.target, Core.SpyState.start, Core.SpyState.total, Core.SpyState.last, Core.SpyState.rate, Core.SpyState.ticks = nil, {}, {}, {}, {}, {}
+        if _G.TrackerCore.SpyState.target == p then
+            _G.TrackerCore.SpyState.target, _G.TrackerCore.SpyState.start, _G.TrackerCore.SpyState.total, _G.TrackerCore.SpyState.last, _G.TrackerCore.SpyState.rate, _G.TrackerCore.SpyState.ticks = nil, {}, {}, {}, {}, {}
         end
         refreshDropdownOptions()
     end)
 
-    for _, name in ipairs(Core.Config.Stats) do
-        pcall(function() Core.SpyState.labels[name] = SpyTab:AddLabel(name .. ": N/A") end)
+    if _G.TrackerCore.SpyTab then
+        for _, name in ipairs(_G.TrackerCore.Config.Stats) do
+            pcall(function() _G.TrackerCore.SpyState.labels[name] = _G.TrackerCore.SpyTab:AddLabel(name .. ": N/A (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0") end)
+        end
     end
 
     ---------------------------------------------------------
@@ -2574,11 +2580,11 @@ do
     task.spawn(function()
         while task.wait(0.5) do
             local currentTime = os.time()
-            local S = Core.SpyState
+            local S = _G.TrackerCore.SpyState
             
             if S.target and S.target.Parent == PlayersRef then
-                for _, name in ipairs(Core.Config.Stats) do
-                    local statObj = Core.Utils.locatePlayerStatObject(S.target, name)
+                for _, name in ipairs(_G.TrackerCore.Config.Stats) do
+                    local statObj = _G.TrackerCore.Utils.locatePlayerStatObject(S.target, name)
                     if statObj and S.labels[name] then
                         local currentVal = tonumber(statObj.Value) or 0
                         if not S.start[name] then
@@ -2595,9 +2601,9 @@ do
                             S.rate[name] = diff / math.max(currentTime - S.ticks[name], 1)
                             S.ticks[name] = currentTime
                         else
-                            if currentTime - (S.ticks[name] or currentTime) > 6 then
-                                S.rate[name] = math.max((S.rate[name] or 0) * 0.8, 0)
-                                if S.rate[name] < 0.1 then S.rate[name] = 0 end
+                            if currentTime - (S.ticks[name] or currentTime) > 60 then
+                                S.rate[name] = math.max((S.rate[name] or 0) * 0.99, 0)
+                                if S.rate[name] < 0.001 then S.rate[name] = 0 end
                             end
                         end
                         S.last[name] = currentVal
@@ -2607,19 +2613,25 @@ do
                         
                         if gained > 0 then
                             if r <= 0 then r = gained / math.max(currentTime - S.startTime, 1) end
-                            Core.Utils.updateLabelText(S.labels[name], string.format(
-                                "%s: %s (+%s) | /m: %s | /h: %s | /d: %s | /w: %s",
-                                name, Core.Utils.formatNumber(currentVal), Core.Utils.formatNumber(gained),
-                                Core.Utils.formatNumber(r * 60), Core.Utils.formatNumber(r * 3600), Core.Utils.formatNumber(r * 86400), Core.Utils.formatNumber(r * 604800)
+                            _G.TrackerCore.Utils.updateLabelText(S.labels[name], string.format(
+                                "%s: %s (+%s) | /M: %s | /H: %s | /D: %s | /W: %s | /MO: %s",
+                                name, _G.TrackerCore.Utils.formatNumber(currentVal), _G.TrackerCore.Utils.formatNumber(gained),
+                                _G.TrackerCore.Utils.formatNumber(r * 60), 
+                                _G.TrackerCore.Utils.formatNumber(r * 3600), 
+                                _G.TrackerCore.Utils.formatNumber(r * 86400), 
+                                _G.TrackerCore.Utils.formatNumber(r * 604800), 
+                                _G.TrackerCore.Utils.formatNumber(r * 2592000)
                             ))
                         else
-                            Core.Utils.updateLabelText(S.labels[name], string.format("%s: %s (+0) | /m: 0 | /h: 0 | /d: 0 | /w: 0", name, Core.Utils.formatContext and Core.Utils.formatNumber(currentVal) or Core.Utils.formatNumber(currentVal)))
+                            _G.TrackerCore.Utils.updateLabelText(S.labels[name], string.format("%s: %s (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0", name, _G.TrackerCore.Utils.formatNumber(currentVal)))
                         end
                     end
                 end
             else
-                for _, name in ipairs(Core.Config.Stats) do
-                    Core.Utils.updateLabelText(S.labels[name], name .. ": N/A (N/A) | /m: N/A | /h: N/A | /d: N/A | /w: N/A")
+                for _, name in ipairs(_G.TrackerCore.Config.Stats) do
+                    if S.labels[name] then
+                        _G.TrackerCore.Utils.updateLabelText(S.labels[name], name .. ": N/A (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0")
+                    end
                 end
             end
         end
@@ -3849,262 +3861,6 @@ Tab:AddButton("Clear All Whitelist", function()
     UpdateWhitelistLabelText()
 end)
 
-local mainTab = window:AddTab("Visuals")
-
--- 2. Setup the full screen blackout overlay
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "EleriumFullBlackout"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999999          -- Forces layout over all game layers
-ScreenGui.IgnoreGuiInset = true           -- THIS REMOVES THE ROBLOX TOPBAR GAP (TRUE FULL SCREEN)
-ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-
-local BlackFrame = Instance.new("Frame")
-BlackFrame.Name = "BlackoutFrame"
-BlackFrame.Size = UDim2.new(1, 0, 1, 0)   -- Spans exactly 100% width and height
-BlackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-BlackFrame.BorderSizePixel = 0
-BlackFrame.Visible = false                -- Hidden by default
-BlackFrame.Parent = ScreenGui
-
--- 3. The Toggle Switch configuration
-mainTab:AddSwitch("Black Screen", function(state)
-    if state then
-        BlackFrame.Visible = true
-        print("Full Black Screen: ACTIVE")
-    else
-        BlackFrame.Visible = false
-        print("Full Black Screen: INACTIVE")
-    end
-end)
-
--- 2. Setup the full screen white flash/overlay container
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "EleriumFullWhiteout"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999999          -- Forces layout over all game layers
-ScreenGui.IgnoreGuiInset = true           -- Removes the Roblox topbar gap for full screen
-ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-
-local WhiteFrame = Instance.new("Frame")
-WhiteFrame.Name = "WhiteoutFrame"
-WhiteFrame.Size = UDim2.new(1, 0, 1, 0)   -- Spans exactly 100% width and height
-WhiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Pure White
-WhiteFrame.BorderSizePixel = 0
-WhiteFrame.Visible = false                -- Hidden by default
-WhiteFrame.Parent = ScreenGui
-
--- 3. The Toggle Switch configuration
-mainTab:AddSwitch("White Screen", function(state)
-    if state then
-        WhiteFrame.Visible = true
-        print("Full White Screen: ACTIVE")
-    else
-        WhiteFrame.Visible = false
-        print("Full White Screen: INACTIVE")
-    end
-end)
-
--- 2. State Toggle & Baseline Server Cache
-local fullbrightEnabled = false
-local Lighting = game:GetService("Lighting")
-
-local originalLighting = {
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    Shadows = Lighting.GlobalShadows
-}
-
--- Background loop to force fullbright (stops internal game loops from resetting light options)
-task.spawn(function()
-    while task.wait(0.5) do
-        if fullbrightEnabled then
-            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-            Lighting.Brightness = 2
-            Lighting.ClockTime = 14 -- Forces noon/daylight
-            Lighting.GlobalShadows = false
-        end
-    end
-end)
-
--- 3. The Fullbright UI Switch configuration
-mainTab:AddSwitch("Fullbright", function(state)
-    fullbrightEnabled = state
-    if not state then
-        -- Cleanly restores the map's original dark/ambient environment settings when turned off
-        Lighting.Ambient = originalLighting.Ambient
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-        Lighting.Brightness = originalLighting.Brightness
-        Lighting.ClockTime = originalLighting.ClockTime
-        Lighting.GlobalShadows = originalLighting.Shadows
-    end
-end)
-
--- 2. State Toggles & Cache Arrays
-local boxEnabled = false
-local nameEnabled = false
-local healthEnabled = false
-local espCache = {}
-
-local function createESP(player)
-    if espCache[player] then return end
-    
-    -- SWITCH 1: Box Highlight setup
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESPHighlight"
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineTransparency = 0
-    highlight.Enabled = false
-    
-    -- SWITCH 2: Name Tag Billboard setup
-    local nameBillboard = Instance.new("BillboardGui")
-    nameBillboard.Name = "ESPNameTag"
-    nameBillboard.Size = UDim2.new(0, 200, 0, 50)
-    nameBillboard.AlwaysOnTop = true 
-    nameBillboard.ExtentsOffset = Vector3.new(0, 3, 0) 
-    nameBillboard.Enabled = false
-    
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Text = player.DisplayName or player.Name
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textLabel.TextSize = 14
-    textLabel.Font = Enum.Font.SourceSansBold
-    textLabel.TextStrokeTransparency = 0 
-    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.Parent = nameBillboard
-
-    -- SWITCH 3: Health Bar Billboard setup
-    local healthBillboard = Instance.new("BillboardGui")
-    healthBillboard.Name = "ESPHealthBar"
-    healthBillboard.Size = UDim2.new(0, 5, 0, 45) -- Slim vertical layout
-    healthBillboard.AlwaysOnTop = true
-    healthBillboard.ExtentsOffset = Vector3.new(-2.2, 0.5, 0) -- Offsets bar perfectly to the left of the character
-    healthBillboard.Enabled = false
-
-    -- Background frame (Dark gray outline)
-    local healthBG = Instance.new("Frame")
-    healthBG.Size = UDim2.new(1, 0, 1, 0)
-    healthBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    healthBG.BorderSizePixel = 0
-    healthBG.Parent = healthBillboard
-
-    -- Dynamic inner bar (Fills vertically up/down)
-    local healthMain = Instance.new("Frame")
-    healthMain.Size = UDim2.new(1, 0, 1, 0) -- Starts at 100% full height
-    healthMain.Position = UDim2.new(0, 0, 1, 0) -- Positioned anchor at bottom
-    healthMain.AnchorPoint = Vector2.new(0, 1)
-    healthMain.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Base Green
-    healthMain.BorderSizePixel = 0
-    healthMain.Parent = healthBG
-
-    -- Store all independent assets in cache
-    espCache[player] = {
-        Highlight = highlight, 
-        NameBillboard = nameBillboard,
-        HealthBillboard = healthBillboard,
-        HealthMain = healthMain,
-        Connection = nil
-    }
-    
-    local function applyESP()
-        local char = player.Character
-        local head = char and char:WaitForChild("Head", 5)
-        local humanoid = char and char:WaitForChild("Humanoid", 5)
-        
-        if char and head and humanoid then
-            highlight.Parent = char
-            
-            nameBillboard.Adornee = head
-            nameBillboard.Parent = head
-            
-            healthBillboard.Adornee = head
-            healthBillboard.Parent = head
-            
-            -- Set baseline visibility states
-            highlight.Enabled = boxEnabled
-            nameBillboard.Enabled = nameEnabled
-            healthBillboard.Enabled = healthEnabled
-
-            -- Dynamic Health Monitoring Connection
-            if espCache[player].Connection then espCache[player].Connection:Disconnect() end
-            
-            local function updateHealth()
-                local hp = humanoid.Health
-                local maxHp = humanoid.MaxHealth
-                local pct = math.clamp(hp / maxHp, 0, 1)
-                
-                -- Dynamic sizing updates
-                healthMain.Size = UDim2.new(1, 0, pct, 0)
-                
-                -- Smooth health color math transition (Green -> Yellow -> Red)
-                healthMain.BackgroundColor3 = Color3.fromHSV(pct * 0.35, 1, 1)
-            end
-            
-            espCache[player].Connection = humanoid:GetPropertyChangedSignal("Health"):Connect(updateHealth)
-            updateHealth() -- Instant run to match initial current parameters
-        end
-    end
-    
-    player.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        applyESP()
-    end)
-    
-    applyESP()
-end
-
--- Track active server players
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then createESP(player) end
-end
-Players.PlayerAdded:Connect(createESP)
-
--- Clear memory allocations upon player exit
-Players.PlayerRemoving:Connect(function(player)
-    if espCache[player] then
-        if espCache[player].Highlight then espCache[player].Highlight:Destroy() end
-        if espCache[player].NameBillboard then espCache[player].NameBillboard:Destroy() end
-        if espCache[player].HealthBillboard then espCache[player].HealthBillboard:Destroy() end
-        if espCache[player].Connection then espCache[player].Connection:Disconnect() end
-        espCache[player] = nil
-    end
-end)
-
--- 3. Individual Control UI Switches
-mainTab:AddSwitch("Box ESP", function(state)
-    boxEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.Highlight then
-            assets.Highlight.Enabled = state
-        end
-    end
-end)
-
-mainTab:AddSwitch("Player Name ESP", function(state)
-    nameEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.NameBillboard then
-            assets.NameBillboard.Enabled = state
-        end
-    end
-end)
-
-mainTab:AddSwitch("Health Bar ESP", function(state)
-    healthEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.HealthBillboard then
-            assets.HealthBillboard.Enabled = state
-        end
-    end
-end)
-
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
 
 local misc = Tab:AddFolder("Misc")
@@ -4294,78 +4050,6 @@ misc:AddSwitch("Noclip", function(state)
     end
 end)
 
--- Logic Variables
-local antiLagEnabled = false
-local originalMaterials = {}
-local lighting = game:GetService("Lighting")
-
--- Helper function to optimize individual assets
-local function optimizePart(part)
-    if part:IsA("BasePart") and not part:IsA("MeshPart") then
-        -- Backup original properties to restore them later
-        if not originalMaterials[part] then
-            originalMaterials[part] = {
-                Material = part.Material,
-                Reflectance = part.Reflectance
-            }
-        end
-        part.Material = Enum.Material.SmoothPlastic
-        part.Reflectance = 0
-    elseif part:IsA("Decal") or part:IsA("Texture") then
-        if not originalMaterials[part] then
-            originalMaterials[part] = {Transparency = part.Transparency}
-        end
-        part.Transparency = 1
-    elseif part:IsA("ParticleEmitter") or part:IsA("Trail") then
-        if not originalMaterials[part] then
-            originalMaterials[part] = {Enabled = part.Enabled}
-        end
-        part.Enabled = false
-    end
-end
-
--- Add the Toggle Switch inside the UI
-misc:AddSwitch("Anti-Lag", function(state)
-    antiLagEnabled = state
-    
-    if antiLagEnabled then
-        -- 1. Optimize existing assets in the world
-        for _, v in pairs(workspace:GetDescendants()) do
-            optimizePart(v)
-        end
-        
-        -- 2. Downgrade lighting and render quality
-        lighting.GlobalShadows = false
-        lighting.FogEnd = 9e9
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        
-        library:CreateNotification("Anti-Lag", "FPS Boost Activated! Visuals minimized.", 4)
-    else
-        -- 3. Restore original visuals perfectly
-        for part, props in pairs(originalMaterials) do
-            if part and part.Parent then
-                for prop, val in pairs(props) do
-                    part[prop] = val
-                end
-            end
-        end
-        table.clear(originalMaterials)
-        
-        lighting.GlobalShadows = true
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-        
-        library:CreateNotification("Anti-Lag", "Visuals restored to normal.", 4)
-    end
-end)
-
--- Optimize new assets that load dynamically while active
-workspace.DescendantAdded:Connect(function(descendant)
-    if antiLagEnabled then
-        task.wait()
-        optimizePart(descendant)
-    end
-end)
-
 misc:AddButton("Fly GUI V3", function()
     -- This executes the external Fly GUI script when the button is clicked
     loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
@@ -4420,6 +4104,247 @@ task.spawn(function()
                     char.Humanoid.WalkSpeed = getgenv().WalkSpeedValue
                 end
             end)
+        end
+    end
+end)
+
+local mainTab = Tab:AddFolder("Misc V3")
+
+-- 2. Setup the full screen blackout overlay
+local ScreenGuiBlack = Instance.new("ScreenGui")
+ScreenGuiBlack.Name = "EleriumFullBlackout"
+ScreenGuiBlack.ResetOnSpawn = false
+ScreenGuiBlack.DisplayOrder = 9999999
+ScreenGuiBlack.IgnoreGuiInset = true
+ScreenGuiBlack.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local BlackFrame = Instance.new("Frame")
+BlackFrame.Name = "BlackoutFrame"
+BlackFrame.Size = UDim2.new(1, 0, 1, 0)
+BlackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BlackFrame.BorderSizePixel = 0
+BlackFrame.Visible = false
+BlackFrame.Parent = ScreenGuiBlack
+
+-- 3. The Toggle Switch configuration
+mainTab:AddSwitch("Black Screen", function(state)
+    if state then
+        BlackFrame.Visible = true
+        print("Full Black Screen: ACTIVE")
+    else
+        BlackFrame.Visible = false
+        print("Full Black Screen: INACTIVE")
+    end
+end)
+
+-- 2. Setup the full screen white flash/overlay container
+local ScreenGuiWhite = Instance.new("ScreenGui")
+ScreenGuiWhite.Name = "EleriumFullWhiteout"
+ScreenGuiWhite.ResetOnSpawn = false
+ScreenGuiWhite.DisplayOrder = 9999999
+ScreenGuiWhite.IgnoreGuiInset = true
+ScreenGuiWhite.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local WhiteFrame = Instance.new("Frame")
+WhiteFrame.Name = "WhiteoutFrame"
+WhiteFrame.Size = UDim2.new(1, 0, 1, 0)
+WhiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+WhiteFrame.BorderSizePixel = 0
+WhiteFrame.Visible = false
+WhiteFrame.Parent = ScreenGuiWhite
+
+-- 3. The Toggle Switch configuration
+mainTab:AddSwitch("White Screen", function(state)
+    if state then
+        WhiteFrame.Visible = true
+        print("Full White Screen: ACTIVE")
+    else
+        WhiteFrame.Visible = false
+        print("Full White Screen: INACTIVE")
+    end
+end)
+
+-- 2. State Toggle & Baseline Server Cache
+local fullbrightEnabled = false
+local Lighting = game:GetService("Lighting")
+
+local originalLighting = {
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    Shadows = Lighting.GlobalShadows
+}
+
+-- Background loop to force fullbright
+task.spawn(function()
+    while task.wait(0.5) do
+        if fullbrightEnabled then
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+        end
+    end
+end)
+
+-- 3. The Fullbright UI Switch configuration
+mainTab:AddSwitch("Fullbright", function(state)
+    fullbrightEnabled = state
+    if not state then
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+        Lighting.GlobalShadows = originalLighting.Shadows
+    end
+end)
+
+-- 2. State Toggles & Cache Arrays
+local boxEnabled = false
+local nameEnabled = false
+local healthEnabled = false
+local espCache = {}
+
+local function createESP(player)
+    if espCache[player] then return end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
+    highlight.Enabled = false
+    
+    local nameBillboard = Instance.new("BillboardGui")
+    nameBillboard.Name = "ESPNameTag"
+    nameBillboard.Size = UDim2.new(0, 200, 0, 50)
+    nameBillboard.AlwaysOnTop = true 
+    nameBillboard.ExtentsOffset = Vector3.new(0, 3, 0) 
+    nameBillboard.Enabled = false
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = player.DisplayName or player.Name
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 14
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeTransparency = 0 
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = nameBillboard
+
+    local healthBillboard = Instance.new("BillboardGui")
+    healthBillboard.Name = "ESPHealthBar"
+    healthBillboard.Size = UDim2.new(0, 5, 0, 45)
+    healthBillboard.AlwaysOnTop = true
+    healthBillboard.ExtentsOffset = Vector3.new(-2.2, 0.5, 0)
+    healthBillboard.Enabled = false
+
+    local healthBG = Instance.new("Frame")
+    healthBG.Size = UDim2.new(1, 0, 1, 0)
+    healthBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    healthBG.BorderSizePixel = 0
+    healthBG.Parent = healthBillboard
+
+    local healthMain = Instance.new("Frame")
+    healthMain.Size = UDim2.new(1, 0, 1, 0)
+    healthMain.Position = UDim2.new(0, 0, 1, 0)
+    healthMain.AnchorPoint = Vector2.new(0, 1)
+    healthMain.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthMain.BorderSizePixel = 0
+    healthMain.Parent = healthBG
+
+    espCache[player] = {
+        Highlight = highlight, 
+        NameBillboard = nameBillboard,
+        HealthBillboard = healthBillboard,
+        HealthMain = healthMain,
+        Connection = nil
+    }
+    
+    local function applyESP()
+        local char = player.Character
+        local head = char and char:WaitForChild("Head", 5)
+        local humanoid = char and char:WaitForChild("Humanoid", 5)
+        
+        if char and head and humanoid then
+            highlight.Parent = char
+            
+            nameBillboard.Adornee = head
+            nameBillboard.Parent = head
+            
+            healthBillboard.Adornee = head
+            healthBillboard.Parent = head
+            
+            highlight.Enabled = boxEnabled
+            nameBillboard.Enabled = nameEnabled
+            healthBillboard.Enabled = healthEnabled
+
+            if espCache[player].Connection then espCache[player].Connection:Disconnect() end
+            
+            local function updateHealth()
+                local hp = humanoid.Health
+                local maxHp = humanoid.MaxHealth
+                local pct = math.clamp(hp / maxHp, 0, 1)
+                
+                healthMain.Size = UDim2.new(1, 0, pct, 0)
+                healthMain.BackgroundColor3 = Color3.fromHSV(pct * 0.35, 1, 1)
+            end
+            
+            espCache[player].Connection = humanoid:GetPropertyChangedSignal("Health"):Connect(updateHealth)
+            updateHealth()
+        end
+    end
+    
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        applyESP()
+    end)
+    
+    applyESP()
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then createESP(player) end
+end
+Players.PlayerAdded:Connect(createESP)
+
+Players.PlayerRemoving:Connect(function(player)
+    if espCache[player] then
+        if espCache[player].Highlight then espCache[player].Highlight:Destroy() end
+        if espCache[player].NameBillboard then espCache[player].NameBillboard:Destroy() end
+        if espCache[player].HealthBillboard then espCache[player].HealthBillboard:Destroy() end
+        if espCache[player].Connection then espCache[player].Connection:Disconnect() end
+        espCache[player] = nil
+    end
+end)
+
+mainTab:AddSwitch("Box ESP", function(state)
+    boxEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.Highlight then
+            assets.Highlight.Enabled = state
+        end
+    end
+end)
+
+mainTab:AddSwitch("Player Name ESP", function(state)
+    nameEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.NameBillboard then
+            assets.NameBillboard.Enabled = state
+        end
+    end
+end)
+
+mainTab:AddSwitch("Health Bar ESP", function(state)
+    healthEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.HealthBillboard then
+            assets.HealthBillboard.Enabled = state
         end
     end
 end)
