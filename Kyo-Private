@@ -2620,15 +2620,21 @@ end
 -- [[ MOVE TO TOP: Core Logic Variables ]]
 local player = game.Players.LocalPlayer
 local whitelistFriendsActive = false 
-local TargetInput = ""            
+local TargetInput = ""         
 local WhitelistedPlayers = {}       -- Dictionary mapping UserId -> true
 local MultiInputText = ""           -- Stores the raw comma-separated text string
+
+-- Added Label Variable Support for Elerium V2 Whitelist Display
+local WhitelistDisplayLabel = nil
 
 -- Target Kill List Variables
 local TargetKillListText = ""       -- Stores the raw comma-separated target kill list string
 local TargetKillListActive = false  -- Toggle state for Loop TP Kill Target List
 local TargetKillPlayers = {}        -- Dictionary mapping UserId -> true for target kill list
 local SpyTargetKillListActive = false -- Toggle state for spying on the target kill list
+
+-- Added Label Variable Support for Elerium V2 Kill List Display
+local KillListDisplayLabel = nil
 
 local LoopKillAllActive = false
 local FastLoopKillAllV2Active = false
@@ -2647,6 +2653,74 @@ local function GetPlayerByInput(input)
         end
     end
     return nil
+end
+
+-- [[ MOVE TO TOP: Helper Function: Update Whitelist List Label Text for Elerium V2 ]]
+local function UpdateWhitelistLabel()
+    if not WhitelistDisplayLabel then return end
+    
+    local displayNames = {}
+    for userId, _ in pairs(WhitelistedPlayers) do
+        local p = game.Players:GetPlayerByUserId(userId)
+        if p then
+            table.insert(displayNames, p.DisplayName)
+        else
+            table.insert(displayNames, tostring(userId))
+        end
+    end
+    
+    local finalString = "Whitelist: (Empty)"
+    if #displayNames > 0 then
+        finalString = "Whitelist: " .. table.concat(displayNames, ", ")
+    end
+    
+    pcall(function()
+        if type(WhitelistDisplayLabel) == "table" then
+            if WhitelistDisplayLabel.Update then
+                WhitelistDisplayLabel:Update(finalString)
+            elseif WhitelistDisplayLabel.SetText then
+                WhitelistDisplayLabel:SetText(finalString)
+            elseif WhitelistDisplayLabel.Text then
+                WhitelistDisplayLabel.Text = finalString
+            end
+        elseif typeof(WhitelistDisplayLabel) == "Instance" and WhitelistDisplayLabel:IsA("TextLabel") then
+            WhitelistDisplayLabel.Text = finalString
+        end
+    end)
+end
+
+-- [[ MOVE TO TOP: Helper Function: Update Kill List Label Text for Elerium V2 ]]
+local function UpdateKillListLabel()
+    if not KillListDisplayLabel then return end
+    
+    local displayNames = {}
+    for userId, _ in pairs(TargetKillPlayers) do
+        local p = game.Players:GetPlayerByUserId(userId)
+        if p then
+            table.insert(displayNames, p.DisplayName)
+        else
+            table.insert(displayNames, tostring(userId))
+        end
+    end
+    
+    local finalString = "Kill List: (Empty)"
+    if #displayNames > 0 then
+        finalString = "Kill List: " .. table.concat(displayNames, ", ")
+    end
+    
+    pcall(function()
+        if type(KillListDisplayLabel) == "table" then
+            if KillListDisplayLabel.Update then
+                KillListDisplayLabel:Update(finalString)
+            elseif KillListDisplayLabel.SetText then
+                KillListDisplayLabel:SetText(finalString)
+            elseif KillListDisplayLabel.Text then
+                KillListDisplayLabel.Text = finalString
+            end
+        elseif typeof(KillListDisplayLabel) == "Instance" and KillListDisplayLabel:IsA("TextLabel") then
+            KillListDisplayLabel.Text = finalString
+        end
+    end)
 end
 
 -- [[ MOVE TO TOP: Helper Function: Check Whitelist / Friend Status ]]
@@ -2692,7 +2766,7 @@ local MyLocalPlayer = _G_Players.LocalPlayer
 local _G_RunService = game:GetService("RunService")
 local _G_CoreGui = game:GetService("CoreGui")
 
--- Core Cleanup Function (Mabilisang pagpatay sa threads kapag isinara ang UI)
+-- Core Cleanup Function
 local function destroyKillTrackerUI()
     if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
     if RenderSteppedConnection then RenderSteppedConnection:Disconnect() RenderSteppedConnection = nil end
@@ -2710,7 +2784,6 @@ local function destroyKillTrackerUI()
 end
 
 local function createKillTrackerUI()
-    -- I-clear ang lumang window kung may nakabukas pa para iwas sa patong-patong na UI
     if _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
         _G_CoreGui.UniversalKillTrackerUI:Destroy()
     end
@@ -2720,7 +2793,6 @@ local function createKillTrackerUI()
     TargetScreenGui.Parent = _G_CoreGui
     TargetScreenGui.ResetOnSpawn = false
 
-    -- Main Drag Frame
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 220, 0, 140)
@@ -2735,19 +2807,17 @@ local function createKillTrackerUI()
     MainCorner.CornerRadius = UDim.new(0, 8)
     MainCorner.Parent = MainFrame
 
-    -- Rainbow Border Stroke
     local FrameStroke = Instance.new("UIStroke")
     FrameStroke.Thickness = 2
     FrameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     FrameStroke.Parent = MainFrame
 
-    -- UI Title Header Label
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Name = "TitleLabel"
     TitleLabel.Size = UDim2.new(1, 0, 0, 28)
     TitleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     TitleLabel.BorderSizePixel = 0
-    TitleLabel.Text = "            Kills Counter UI"
+    TitleLabel.Text = "          Kills Counter UI"
     TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     TitleLabel.TextSize = 22
     TitleLabel.Font = Enum.Font.SourceSansBold
@@ -2758,20 +2828,18 @@ local function createKillTrackerUI()
     TitleCorner.CornerRadius = UDim.new(0, 8)
     TitleCorner.Parent = TitleLabel
 
-    -- ADDED: ScreenGui Close "X" Button 
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = UDim2.new(0, 24, 0, 24)
     CloseButton.Position = UDim2.new(1, -26, 0, 2)
     CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    CloseButton.BackgroundTransparency = 1 -- Transparent background para malinis tingnan
+    CloseButton.BackgroundTransparency = 1 
     CloseButton.Text = "X"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80) -- Kulay pulang X para sa delikadong itsura
+    CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80) 
     CloseButton.TextSize = 14
     CloseButton.Font = Enum.Font.SourceSansBold
     CloseButton.Parent = MainFrame
 
-    -- Line 1: Kills Display
     local KillCounterLabel = Instance.new("TextLabel")
     KillCounterLabel.Name = "KillCounterLabel"
     KillCounterLabel.Size = UDim2.new(1, 0, 0, 32)
@@ -2782,7 +2850,6 @@ local function createKillTrackerUI()
     KillCounterLabel.Font = Enum.Font.SourceSansBold
     KillCounterLabel.Parent = MainFrame
 
-    -- Line 2: KillStreak Display
     local StreakCounterLabel = Instance.new("TextLabel")
     StreakCounterLabel.Name = "StreakCounterLabel"
     StreakCounterLabel.Size = UDim2.new(1, 0, 0, 32)
@@ -2793,7 +2860,6 @@ local function createKillTrackerUI()
     StreakCounterLabel.Font = Enum.Font.SourceSansBold
     StreakCounterLabel.Parent = MainFrame
 
-    -- Line 3: Kills Gained Display
     local GainedCounterLabel = Instance.new("TextLabel")
     GainedCounterLabel.Name = "GainedCounterLabel"
     GainedCounterLabel.Size = UDim2.new(1, 0, 0, 32)
@@ -2807,7 +2873,6 @@ local function createKillTrackerUI()
     local initialKillsSet = false
     local lastKillsValue = 0
 
-    -- Forced Polling Value Listener Engine Thread Hook
     HeartbeatConnection = _G_RunService.Heartbeat:Connect(function()
         pcall(function()
             local leaderstats = MyLocalPlayer:FindFirstChild("leaderstats")
@@ -2842,7 +2907,6 @@ local function createKillTrackerUI()
         end)
     end)
 
-    -- Smooth Rainbow RGB chroma execution loop hook
     RenderSteppedConnection = _G_RunService.RenderStepped:Connect(function()
         local speedMultiplier = 3 
         local gameTime = os.clock() * speedMultiplier
@@ -2859,22 +2923,17 @@ local function createKillTrackerUI()
         GainedCounterLabel.TextColor3 = rainbowColor
     end)
 
-    -- CLOSE BUTTON EVENT LISTEN TRIGGER (Dito isasara at lilinisin ang memory)
     CloseButton.MouseButton1Click:Connect(function()
         destroyKillTrackerUI()
     end)
 end
 
--- ============================================================================
--- ELERIUM V2 TAB BUTTON REGISTRATION (Pinalitan ang Switch ng Button)
--- ============================================================================
 Tab:AddButton("Kills Counter UI", function()
     createKillTrackerUI()
 end)
 
 -- [[ UI Elements Setup ]]
 
--- 5. Loop TP Kill All Switch
 Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
     LoopKillAllActive = Value
     if Value then
@@ -2936,7 +2995,6 @@ Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
     end
 end)
 
--- New Loop TP Kill All V2 (Fast Teleport & Multi-Hit)
 Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
     FastLoopKillAllV2Active = Value
     if Value then
@@ -2959,7 +3017,6 @@ Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
                             local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
                             
                             if tRoot and tHumanoid and tHumanoid.Health > 0 then
-                                -- Instant Teleport Burst on Target
                                 for _ = 1, 3 do
                                     if not FastLoopKillAllV2Active or tHumanoid.Health <= 0 then break end
                                     
@@ -2998,7 +3055,6 @@ Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
     end
 end)
 
--- 6. Target Filter Box
 Tab:AddTextBox("Target Player Name / Nickname", function(text)
     TargetInput = text
 end, {
@@ -3006,7 +3062,6 @@ end, {
     ["clear"] = false
 })
 
--- 7. Solo Target Assassin
 Tab:AddSwitch("TP Kill Target", function(state)
     LoopKilling = state
     if LoopKilling then
@@ -3038,7 +3093,6 @@ Tab:AddSwitch("TP Kill Target", function(state)
     end
 end)
 
--- 8. Spectator Utility
 Tab:AddSwitch("Spy Target", function(state)
     Spectating = state
     local camera = workspace.CurrentCamera
@@ -3068,6 +3122,9 @@ Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 -- [[ UPDATED: Target Kill List Features ]]
 
+-- Kill List UI Label Display (Elerium V2)
+KillListDisplayLabel = Tab:AddLabel("Kill List: (Empty)")
+
 Tab:AddTextBox("Type Names To Kill List", function(text)
     TargetKillListText = text
 end, {
@@ -3091,12 +3148,14 @@ Tab:AddButton("Add To Target Kill List", function()
             print("[TARGET KILL LIST] Could not find player: '" .. cleanName .. "'")
         end
     end
+    UpdateKillListLabel()
 end)
 
 Tab:AddButton("Clear All Target Kill List", function()
     TargetKillListText = ""
     TargetKillPlayers = {}
     print("[TARGET KILL LIST] Target Kill List cleared completely.")
+    UpdateKillListLabel()
 end)
 
 Tab:AddSwitch("TP Kill Target List", function(Value)
@@ -3163,7 +3222,6 @@ Tab:AddSwitch("TP Kill Target List", function(Value)
     end
 end)
 
--- Spy Target Kill List Switch (Cycles through active players in your kill list)
 Tab:AddSwitch("Spy Target Kill List", function(state)
     SpyTargetKillListActive = state
     local camera = workspace.CurrentCamera
@@ -3178,11 +3236,10 @@ Tab:AddSwitch("Spy Target Kill List", function(state)
                     if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 then
                         camera.CameraSubject = targetPlayer.Character.Humanoid
                         foundTarget = true
-                        task.wait(3) -- Spectate each target for 3 seconds before rotating to the next one
+                        task.wait(3) 
                     end
                 end
                 
-                -- If no valid target is found/alive, fallback to local player temporarily
                 if not foundTarget then
                     if player.Character and player.Character:FindFirstChild("Humanoid") then
                         camera.CameraSubject = player.Character.Humanoid
@@ -3198,7 +3255,6 @@ Tab:AddSwitch("Spy Target Kill List", function(state)
     end
 end)
 
--- Your original SimpleSpy helper function
 local function getNil(name, class) 
     for _, v in pairs(getnilinstances()) do 
         if v.ClassName == class and v.Name == name then 
@@ -3207,7 +3263,6 @@ local function getNil(name, class)
     end 
 end
 
--- Reusable punch function
 local function firePunch()
     local args = {
         "RightHand"
@@ -3215,7 +3270,6 @@ local function firePunch()
     game:GetService("ReplicatedStorage").remotes.punchRequest:FireServer(unpack(args))
 end
 
--- Proper Elerium v2 Switch control
 local autoPunchEnabled = false
 Tab:AddSwitch("Auto Punch (No Anim)", function(state)
     autoPunchEnabled = state
@@ -3294,13 +3348,18 @@ game:GetService('RunService').RenderStepped:Connect(function()
     end
 end)
 
--- 1. Whitelist Friends Toggle Switch
 local whitelistSwitch = Tab:AddSwitch("Whitelist Friends", function(bool)
     whitelistFriendsActive = bool
 end)
 if whitelistSwitch and whitelistSwitch.Set then whitelistSwitch:Set(false) end
 
--- 2. Multi-Whitelist Text Box (Supports multiple names split by commas)
+Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+-- [[ UPDATED: Whitelist List Features ]]
+
+-- Whitelist UI Label Display (Elerium V2)
+WhitelistDisplayLabel = Tab:AddLabel("Whitelist: (Empty)")
+
 Tab:AddTextBox("Type Name Player To Whitelist", function(text)
     MultiInputText = text
 end, {
@@ -3308,7 +3367,6 @@ end, {
     ["clear"] = false
 })
 
--- 3. Whitelist Action Button (Processes the multi-string)
 Tab:AddButton("Add Whitelist Players", function()
     if MultiInputText == "" then 
         print("[WHITELIST] Text box is empty!")
@@ -3319,18 +3377,19 @@ Tab:AddButton("Add Whitelist Players", function()
         local target = GetPlayerByInput(nameSegment)
         if target then
             WhitelistedPlayers[target.UserId] = true
-            print("[WHITELIST] Added: " + target.Name + " (" + target.DisplayName + ")")
+            print("[WHITELIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
         else
             local cleanName = nameSegment:match("^%s*(.-)%s*$")
-            print("[WHITELIST] Could not find player: '" + cleanName + "'")
+            print("[WHITELIST] Could not find player: '" .. cleanName .. "'")
         end
     end
+    UpdateWhitelistLabel()
 end)
 
--- 4. Clear Whitelist Action Button
 Tab:AddButton("Clear All Whitelist", function()
     WhitelistedPlayers = {}
     print("[WHITELIST] Whitelist cleared completely.")
+    UpdateWhitelistLabel()
 end)
 
 Tab:AddLabel("Auto Kill V2")
@@ -3348,6 +3407,10 @@ _G.PlayersService = game:GetService("Players")
 _G.RunService = game:GetService("RunService")
 _G.MyLocalPlayer = _G.PlayersService.LocalPlayer
 local Camera = workspace.CurrentCamera
+
+-- Global reference variables for Elerium V2 display labels
+local KillListDisplayLabel = nil
+local WhitelistDisplayLabel = nil
 
 -- ============================================================================
 -- BACKGROUND ASYNC FRIENDS CACHING FRAMEWORK
@@ -3398,7 +3461,6 @@ function teleportToMe(targetPlayer, targetLocalPlayer)
     local myRoot = targetLocalPlayer.Character and (targetLocalPlayer.Character:FindFirstChild("HumanoidRootPart") or targetLocalPlayer.Character:FindFirstChild("Torso"))
     if not targetRoot or not myRoot then return end
     
-    -- Target is offset precisely 3 studs in front of local player
     pcall(function() targetRoot.CFrame = myRoot.CFrame * CFrame.new(0, 0, -3) end)
 end
 
@@ -3432,11 +3494,98 @@ local function resetCamera()
 end
 
 -- ============================================================================
--- SPECTATE TRACKING ENGINE (EXACT SPY TARGET BEHAVIOR FOR BOTH)
+-- HELPER: UPDATE KILL LIST LABEL TEXT FOR ELERIUM V2 (NO DUPLICATES)
+-- ============================================================================
+local function UpdateKillListLabelText()
+    if not KillListDisplayLabel then return end
+    
+    local addedNames = {}
+    local displayNames = {}
+    
+    for _, entry in ipairs(_G.targetKillListTable) do
+        local foundName = entry
+        for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+            if player.Name:lower() == entry or player.DisplayName:lower() == entry then
+                foundName = player.DisplayName
+                break
+            end
+        end
+        
+        if not addedNames[foundName] then
+            addedNames[foundName] = true
+            table.insert(displayNames, foundName)
+        end
+    end
+    
+    local finalString = "Kill List: (Empty)"
+    if #displayNames > 0 then
+        finalString = "Kill List: " .. table.concat(displayNames, ", ")
+    end
+    
+    pcall(function()
+        if type(KillListDisplayLabel) == "table" then
+            if KillListDisplayLabel.Update then
+                KillListDisplayLabel:Update(finalString)
+            elseif KillListDisplayLabel.SetText then
+                KillListDisplayLabel:SetText(finalString)
+            elseif KillListDisplayLabel.Text then
+                KillListDisplayLabel.Text = finalString
+            end
+        elseif typeof(KillListDisplayLabel) == "Instance" and KillListDisplayLabel:IsA("TextLabel") then
+            KillListDisplayLabel.Text = finalString
+        end
+    end)
+end
+
+-- ============================================================================
+-- HELPER: UPDATE WHITELIST LABEL TEXT FOR ELERIUM V2 (NO DUPLICATES)
+-- ============================================================================
+local function UpdateWhitelistLabelText()
+    if not WhitelistDisplayLabel then return end
+    
+    local addedNames = {}
+    local displayNames = {}
+    
+    for _, entry in ipairs(_G.whitelistTable) do
+        local foundName = entry
+        for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+            if player.Name:lower() == entry or player.DisplayName:lower() == entry then
+                foundName = player.DisplayName
+                break
+            end
+        end
+        
+        if not addedNames[foundName] then
+            addedNames[foundName] = true
+            table.insert(displayNames, foundName)
+        end
+    end
+    
+    local finalString = "Whitelist: (Empty)"
+    if #displayNames > 0 then
+        finalString = "Whitelist: " .. table.concat(displayNames, ", ")
+    end
+    
+    pcall(function()
+        if type(WhitelistDisplayLabel) == "table" then
+            if WhitelistDisplayLabel.Update then
+                WhitelistDisplayLabel:Update(finalString)
+            elseif WhitelistDisplayLabel.SetText then
+                WhitelistDisplayLabel:SetText(finalString)
+            elseif WhitelistDisplayLabel.Text then
+                WhitelistDisplayLabel.Text = finalString
+            end
+        elseif typeof(WhitelistDisplayLabel) == "Instance" and WhitelistDisplayLabel:IsA("TextLabel") then
+            WhitelistDisplayLabel.Text = finalString
+        end
+    end)
+end
+
+-- ============================================================================
+-- SPECTATE TRACKING ENGINE
 -- ============================================================================
 task.spawn(function()
     while true do
-        -- Single Target Spectate (Spy Target)
         if _G.SpectateTargetActive and _G.SingleTargetName ~= "" then
             local searchString = _G.SingleTargetName:lower()
             local targetFound = false
@@ -3465,7 +3614,6 @@ task.spawn(function()
                 resetCamera()
             end
             
-        -- Target Kill List Spectate (Spy Target List - Following exact Spy Target logic per player)
         elseif _G.SpectateTargetListActive and #_G.targetKillListTable > 0 then
             local targetFound = false
             for _, player in ipairs(_G.PlayersService:GetPlayers()) do
@@ -3507,7 +3655,6 @@ task.spawn(function()
                 if char:FindFirstChild("Punch") then char.Punch:Activate() end
             end
             
-            -- Targeted Killing/Teleportation Logic
             if _G.autokilltargetlist then
                 for _, player in ipairs(_G.PlayersService:GetPlayers()) do
                     if player ~= _G.MyLocalPlayer and not isPlayerWhitelisted(player, _G.MyLocalPlayer) then
@@ -3584,6 +3731,9 @@ end)
 
 Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
+-- Kill List Display Label setup for Elerium V2
+KillListDisplayLabel = Tab:AddLabel("Kill List: (Empty)")
+
 Tab:AddTextBox("Target Player Kill List", function(text)
     _G.targetKillInputTextCache = text
 end, {["clear"] = false})
@@ -3617,6 +3767,7 @@ Tab:AddButton("Add To Target Kill List", function()
                 print("Name is already inside the Target Kill List.")
             end
         end
+        UpdateKillListLabelText()
     else
         print("Error: Target Kill TextBox is empty! Type a name first.")
     end
@@ -3625,6 +3776,7 @@ end)
 Tab:AddButton("Clear All Target Kill List", function()
     table.clear(_G.targetKillListTable)
     print("Target Kill List cleared completely.")
+    UpdateKillListLabelText()
 end)
 
 Tab:AddSwitch("Auto Kill Target List", function(state) _G.autokilltargetlist = state end)
@@ -3637,6 +3789,11 @@ Tab:AddSwitch("Spy Target List", function(state)
 end)
 
 Tab:AddSwitch("Whitelist Friends", function(state) _G.FriendsWhitelistActive = state; if state then updateFriendsCache() else table.clear(_G.friendsCache) end end)
+
+Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+-- Whitelist Display Label setup for Elerium V2
+WhitelistDisplayLabel = Tab:AddLabel("Whitelist: (Empty)")
 
 Tab:AddTextBox("Type Player Name To Whitelist", function(text)
     _G.whitelistInputTextCache = text
@@ -3671,6 +3828,7 @@ Tab:AddButton("Add Whitelist Player", function()
                 print("Name is already inside the whitelist framework.")
             end
         end
+        UpdateWhitelistLabelText()
     else
         print("Error: Whitelist TextBox is empty! Type a name first.")
     end
@@ -3679,248 +3837,7 @@ end)
 Tab:AddButton("Clear All Whitelist", function()
     table.clear(_G.whitelistTable)
     print("Whitelist cleared completely.")
-end)
-
-Tab:AddLabel("Auto Kill V3")
-
--- 3. Core Operational Data Layers (Tables)
-local whitelistTable = {} 
-local blacklistTable = {} 
-
-_G.autokillall = false
-_G.autokilltarget = false
-_G.AutoPunchActive = false 
-_G.SingleTargetName = ""
-_G.WhitelistInputText = "" 
-_G.FriendsWhitelistActive = false
-
--- The Loop-Active Tool Function requested
-local function runContinuousToolLogic(localPlayer)
-    local char = localPlayer.Character
-    if not char then return end
-
-    -- Tool Verification & Auto-Equipping Logic
-    local tool = char:FindFirstChild("Punch")
-    if not tool then
-        local backpack = localPlayer:FindFirstChild("Backpack")
-        if backpack then
-            local bpTool = backpack:FindFirstChild("Punch")
-            if bpTool then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    hum:EquipTool(bpTool)
-                end
-            end
-        end
-    end
-
-    -- Tool Activation
-    local activeTool = char:FindFirstChild("Punch")
-    if activeTool then
-        activeTool:Activate()
-    end
-end
-
--- Separate Hitbox and Remote Execution Handler
-local function executeAttack(targetPlayer, localPlayer, localLeftHand)
-    if targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") and localLeftHand then
-        local targetHead = targetPlayer.Character.Head
-        
-        pcall(function()
-            firetouchinterest(targetHead, localLeftHand, 0)
-            task.wait(0.01)
-            firetouchinterest(targetHead, localLeftHand, 1)
-        end)
-        
-        pcall(function()
-            localPlayer.muscleEvent:FireServer("punch", "leftHand")
-            localPlayer.muscleEvent:FireServer("punch", "rightHand")
-        end)
-    end
-end
-
--- Helper validation function for 'Kill All'
-local function isPlayerWhitelisted(targetName, localPlayer)
-    if targetName == localPlayer.Name then return true end
-    
-    for _, whitelistedName in ipairs(whitelistTable) do
-        if targetName == whitelistedName then return true end
-    end
-    
-    for _, blacklistedName in ipairs(blacklistTable) do
-        if targetName == blacklistedName then return false end
-    end
-    
-    return false
-end
-
--- Helper function to check and safely add a friend to the whitelist table
-local function checkAndWhitelistFriend(player, localPlayer)
-    if player == localPlayer then return end
-    local isFriend = false
-    pcall(function()
-        isFriend = localPlayer:IsFriendsWithAsync(player.UserId)
-    end)
-    if isFriend then
-        if not table.find(whitelistTable, player.Name) then
-            table.insert(whitelistTable, player.Name)
-        end
-    end
-end
-
--- 5. FUNCTION A: Auto Kill All Switch
-Tab:AddSwitch('Auto Kill All', function(state)
-    _G.autokillall = state
-    
-    if state then
-        -- Thread 1: Continuous Fast Tool Punch Loop
-        task.spawn(function()
-            while _G.autokillall do
-                local localPlayer = game:GetService("Players").LocalPlayer
-                if localPlayer then
-                    runContinuousToolLogic(localPlayer)
-                end
-                task.wait() -- Fires loop at maximum engine speeds
-            end
-        end)
-
-        -- Thread 2: Target Scanner / Hitbox Loop
-        task.spawn(function()
-            while _G.autokillall do
-                local players = game:GetService("Players"):GetPlayers()
-                local localPlayer = game:GetService("Players").LocalPlayer
-                
-                if not localPlayer or not localPlayer.Character then 
-                    task.wait() 
-                    continue 
-                end
-                
-                local localLeftHand = localPlayer.Character:FindFirstChild("LeftHand")
-                
-                for _, player in ipairs(players) do
-                    if not _G.autokillall then break end
-                    if not isPlayerWhitelisted(player.Name, localPlayer) then
-                        executeAttack(player, localPlayer, localLeftHand)
-                    end
-                end
-                
-                game:GetService('RunService').RenderStepped:Wait()
-            end
-        end)
-    end
-end)
-
--- 6. FUNCTION B: Auto Kill Target Switch
-Tab:AddSwitch('Auto Kill Target', function(state)
-    _G.autokilltarget = state
-    
-    if state then
-        -- Thread 1: Continuous Fast Tool Punch Loop
-        task.spawn(function()
-            while _G.autokilltarget do
-                local localPlayer = game:GetService("Players").LocalPlayer
-                if localPlayer then
-                    runContinuousToolLogic(localPlayer)
-                end
-                task.wait()
-            end
-        end)
-
-        -- Thread 2: Target Scanner / Hitbox Loop
-        task.spawn(function()
-            while _G.autokilltarget do
-                local players = game:GetService("Players"):GetPlayers()
-                local localPlayer = game:GetService("Players").LocalPlayer
-                
-                if not localPlayer or not localPlayer.Character then 
-                    task.wait() 
-                    continue 
-                end
-                
-                local localLeftHand = localPlayer.Character:FindFirstChild("LeftHand")
-                
-                for _, player in ipairs(players) do
-                    if not _G.autokilltarget then break end
-                    
-                    if _G.SingleTargetName ~= "" then
-                        local searchString = _G.SingleTargetName:lower()
-                        local usernameMatch = player.Name:lower():find(searchString)
-                        local nicknameMatch = player.DisplayName:lower():find(searchString)
-                        
-                        if usernameMatch or nicknameMatch then
-                            executeAttack(player, localPlayer, localLeftHand)
-                        end
-                    end
-                end
-                
-                game:GetService('RunService').RenderStepped:Wait()
-            end
-        end)
-    end
-end)
-
--- 4. Target Input Selection Component (Accepts Username or Nickname)
-Tab:AddTextBox("Singel Auto Kill", function(text)
-    _G.SingleTargetName = text
-end)
-
--- 11. Friend Filtering Management Switch
-Tab:AddSwitch('Whitelist Friends', function(state)
-    local localPlayer = game:GetService("Players").LocalPlayer
-    if not localPlayer then return end
-    
-    _G.FriendsWhitelistActive = state
-    if state then
-        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-            checkAndWhitelistFriend(player, localPlayer)
-        end
-    else
-        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-            pcall(function()
-                if localPlayer:IsFriendsWithAsync(player.UserId) then
-                    local index = table.find(whitelistTable, player.Name)
-                    if index then table.remove(whitelistTable, index) end
-                end
-            end)
-        end
-    end
-end)
-
--- 12. Dynamic Runtime Listener for Incoming Players
-game:GetService("Players").PlayerAdded:Connect(function(player)
-    if _G.FriendsWhitelistActive then
-        local localPlayer = game:GetService("Players").LocalPlayer
-        task.wait(1) 
-        if localPlayer then checkAndWhitelistFriend(player, localPlayer) end
-    end
-end)
-
--- 8. Whitelist Textbox
-Tab:AddTextBox("Type Player Name To Whitelist", function(text)
-    _G.WhitelistInputText = text
-end)
-
--- 9. Whitelist Confirmation Button
-Tab:AddButton("Add to Whitelist", function()
-    local text = _G.WhitelistInputText
-    if text == "" then return end
-    
-    local searchString = text:lower()
-    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-        local usernameMatch = player.Name:lower():find(searchString)
-        local nicknameMatch = player.DisplayName:lower():find(searchString)
-        
-        if usernameMatch or nicknameMatch then
-            if not table.find(whitelistTable, player.Name) then
-                table.insert(whitelistTable, player.Name)
-            end
-        end
-    end
-end)
-
--- 10. Clear Whitelist Button
-Tab:AddButton("Clear Whitelist", function()
-    table.clear(whitelistTable)
+    UpdateWhitelistLabelText()
 end)
 
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
