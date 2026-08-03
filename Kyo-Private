@@ -3849,6 +3849,262 @@ Tab:AddButton("Clear All Whitelist", function()
     UpdateWhitelistLabelText()
 end)
 
+local mainTab = window:AddTab("Visuals")
+
+-- 2. Setup the full screen blackout overlay
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EleriumFullBlackout"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 9999999          -- Forces layout over all game layers
+ScreenGui.IgnoreGuiInset = true           -- THIS REMOVES THE ROBLOX TOPBAR GAP (TRUE FULL SCREEN)
+ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local BlackFrame = Instance.new("Frame")
+BlackFrame.Name = "BlackoutFrame"
+BlackFrame.Size = UDim2.new(1, 0, 1, 0)   -- Spans exactly 100% width and height
+BlackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BlackFrame.BorderSizePixel = 0
+BlackFrame.Visible = false                -- Hidden by default
+BlackFrame.Parent = ScreenGui
+
+-- 3. The Toggle Switch configuration
+mainTab:AddSwitch("Black Screen", function(state)
+    if state then
+        BlackFrame.Visible = true
+        print("Full Black Screen: ACTIVE")
+    else
+        BlackFrame.Visible = false
+        print("Full Black Screen: INACTIVE")
+    end
+end)
+
+-- 2. Setup the full screen white flash/overlay container
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EleriumFullWhiteout"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 9999999          -- Forces layout over all game layers
+ScreenGui.IgnoreGuiInset = true           -- Removes the Roblox topbar gap for full screen
+ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local WhiteFrame = Instance.new("Frame")
+WhiteFrame.Name = "WhiteoutFrame"
+WhiteFrame.Size = UDim2.new(1, 0, 1, 0)   -- Spans exactly 100% width and height
+WhiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Pure White
+WhiteFrame.BorderSizePixel = 0
+WhiteFrame.Visible = false                -- Hidden by default
+WhiteFrame.Parent = ScreenGui
+
+-- 3. The Toggle Switch configuration
+mainTab:AddSwitch("White Screen", function(state)
+    if state then
+        WhiteFrame.Visible = true
+        print("Full White Screen: ACTIVE")
+    else
+        WhiteFrame.Visible = false
+        print("Full White Screen: INACTIVE")
+    end
+end)
+
+-- 2. State Toggle & Baseline Server Cache
+local fullbrightEnabled = false
+local Lighting = game:GetService("Lighting")
+
+local originalLighting = {
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    Shadows = Lighting.GlobalShadows
+}
+
+-- Background loop to force fullbright (stops internal game loops from resetting light options)
+task.spawn(function()
+    while task.wait(0.5) do
+        if fullbrightEnabled then
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14 -- Forces noon/daylight
+            Lighting.GlobalShadows = false
+        end
+    end
+end)
+
+-- 3. The Fullbright UI Switch configuration
+mainTab:AddSwitch("Fullbright", function(state)
+    fullbrightEnabled = state
+    if not state then
+        -- Cleanly restores the map's original dark/ambient environment settings when turned off
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+        Lighting.GlobalShadows = originalLighting.Shadows
+    end
+end)
+
+-- 2. State Toggles & Cache Arrays
+local boxEnabled = false
+local nameEnabled = false
+local healthEnabled = false
+local espCache = {}
+
+local function createESP(player)
+    if espCache[player] then return end
+    
+    -- SWITCH 1: Box Highlight setup
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
+    highlight.Enabled = false
+    
+    -- SWITCH 2: Name Tag Billboard setup
+    local nameBillboard = Instance.new("BillboardGui")
+    nameBillboard.Name = "ESPNameTag"
+    nameBillboard.Size = UDim2.new(0, 200, 0, 50)
+    nameBillboard.AlwaysOnTop = true 
+    nameBillboard.ExtentsOffset = Vector3.new(0, 3, 0) 
+    nameBillboard.Enabled = false
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = player.DisplayName or player.Name
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 14
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeTransparency = 0 
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = nameBillboard
+
+    -- SWITCH 3: Health Bar Billboard setup
+    local healthBillboard = Instance.new("BillboardGui")
+    healthBillboard.Name = "ESPHealthBar"
+    healthBillboard.Size = UDim2.new(0, 5, 0, 45) -- Slim vertical layout
+    healthBillboard.AlwaysOnTop = true
+    healthBillboard.ExtentsOffset = Vector3.new(-2.2, 0.5, 0) -- Offsets bar perfectly to the left of the character
+    healthBillboard.Enabled = false
+
+    -- Background frame (Dark gray outline)
+    local healthBG = Instance.new("Frame")
+    healthBG.Size = UDim2.new(1, 0, 1, 0)
+    healthBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    healthBG.BorderSizePixel = 0
+    healthBG.Parent = healthBillboard
+
+    -- Dynamic inner bar (Fills vertically up/down)
+    local healthMain = Instance.new("Frame")
+    healthMain.Size = UDim2.new(1, 0, 1, 0) -- Starts at 100% full height
+    healthMain.Position = UDim2.new(0, 0, 1, 0) -- Positioned anchor at bottom
+    healthMain.AnchorPoint = Vector2.new(0, 1)
+    healthMain.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Base Green
+    healthMain.BorderSizePixel = 0
+    healthMain.Parent = healthBG
+
+    -- Store all independent assets in cache
+    espCache[player] = {
+        Highlight = highlight, 
+        NameBillboard = nameBillboard,
+        HealthBillboard = healthBillboard,
+        HealthMain = healthMain,
+        Connection = nil
+    }
+    
+    local function applyESP()
+        local char = player.Character
+        local head = char and char:WaitForChild("Head", 5)
+        local humanoid = char and char:WaitForChild("Humanoid", 5)
+        
+        if char and head and humanoid then
+            highlight.Parent = char
+            
+            nameBillboard.Adornee = head
+            nameBillboard.Parent = head
+            
+            healthBillboard.Adornee = head
+            healthBillboard.Parent = head
+            
+            -- Set baseline visibility states
+            highlight.Enabled = boxEnabled
+            nameBillboard.Enabled = nameEnabled
+            healthBillboard.Enabled = healthEnabled
+
+            -- Dynamic Health Monitoring Connection
+            if espCache[player].Connection then espCache[player].Connection:Disconnect() end
+            
+            local function updateHealth()
+                local hp = humanoid.Health
+                local maxHp = humanoid.MaxHealth
+                local pct = math.clamp(hp / maxHp, 0, 1)
+                
+                -- Dynamic sizing updates
+                healthMain.Size = UDim2.new(1, 0, pct, 0)
+                
+                -- Smooth health color math transition (Green -> Yellow -> Red)
+                healthMain.BackgroundColor3 = Color3.fromHSV(pct * 0.35, 1, 1)
+            end
+            
+            espCache[player].Connection = humanoid:GetPropertyChangedSignal("Health"):Connect(updateHealth)
+            updateHealth() -- Instant run to match initial current parameters
+        end
+    end
+    
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        applyESP()
+    end)
+    
+    applyESP()
+end
+
+-- Track active server players
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then createESP(player) end
+end
+Players.PlayerAdded:Connect(createESP)
+
+-- Clear memory allocations upon player exit
+Players.PlayerRemoving:Connect(function(player)
+    if espCache[player] then
+        if espCache[player].Highlight then espCache[player].Highlight:Destroy() end
+        if espCache[player].NameBillboard then espCache[player].NameBillboard:Destroy() end
+        if espCache[player].HealthBillboard then espCache[player].HealthBillboard:Destroy() end
+        if espCache[player].Connection then espCache[player].Connection:Disconnect() end
+        espCache[player] = nil
+    end
+end)
+
+-- 3. Individual Control UI Switches
+mainTab:AddSwitch("Box ESP", function(state)
+    boxEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.Highlight then
+            assets.Highlight.Enabled = state
+        end
+    end
+end)
+
+mainTab:AddSwitch("Player Name ESP", function(state)
+    nameEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.NameBillboard then
+            assets.NameBillboard.Enabled = state
+        end
+    end
+end)
+
+mainTab:AddSwitch("Health Bar ESP", function(state)
+    healthEnabled = state
+    for player, assets in pairs(espCache) do
+        if player.Character and assets.HealthBillboard then
+            assets.HealthBillboard.Enabled = state
+        end
+    end
+end)
+
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
 
 local misc = Tab:AddFolder("Misc")
