@@ -4007,33 +4007,7 @@ misc:AddButton("Jerk Tool (R15)", function()
     loadstring(game:HttpGet("https://pastefy.app/YZoglOyJ/raw"))()
 end)
 
-local WalkflingEnabled = false
--- Changed AddToggle to AddSwitch
-misc:AddSwitch("OP Walkfling", function(Value)
-    WalkflingEnabled = Value
-    task.spawn(function()
-        local lp = game.Players.LocalPlayer
-        while WalkflingEnabled do
-            local char = lp.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if hrp and hum then
-                hum:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
-                hrp.AssemblyLinearVelocity = Vector3.new(0, 5000, 0)
-                hrp.AssemblyAngularVelocity = Vector3.new(0, 10000, 0)
-            end
-            task.wait(0.05)
-        end
-        
-        local char = lp.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        end
-    end)
-end)
+
 
 local ClickTPEnabled = false
 local Mouse = game.Players.LocalPlayer:GetMouse()
@@ -4061,7 +4035,7 @@ local TargetHeight = 7.2
 local Player = game.Players.LocalPlayer
 
 -- AddSwitch using proper structural framework
-local SwitchInstance = misc:AddSwitch("Custom Jump", function(State)
+local SwitchInstance = misc:AddSwitch("Jump~Power", function(State)
     JumpModEnabled = State
     if not State then
         -- Restore base physics options instantly when disabled
@@ -4215,6 +4189,27 @@ misc:AddButton("Fly GUI V3", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
 end)
 
+local InfiniteJumpEnabled = false
+
+-- 1. Switch to Enable/Disable
+misc:AddSwitch("Infinite Jump", function(Value)
+    InfiniteJumpEnabled = Value
+end)
+
+-- 2. The Logic (Listen for Jump Request)
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if InfiniteJumpEnabled then
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid then
+            -- Set state to Jumping to allow another jump in mid-air
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
 -- Variables for control
 getgenv().LoopSpeedEnabled = false
 getgenv().WalkSpeedValue = 16
@@ -4243,27 +4238,6 @@ task.spawn(function()
                     char.Humanoid.WalkSpeed = getgenv().WalkSpeedValue
                 end
             end)
-        end
-    end
-end)
-
-local InfiniteJumpEnabled = false
-
--- 1. Switch to Enable/Disable
-misc:AddSwitch("Infinite Jump", function(Value)
-    InfiniteJumpEnabled = Value
-end)
-
--- 2. The Logic (Listen for Jump Request)
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    if InfiniteJumpEnabled then
-        local player = game.Players.LocalPlayer
-        local character = player.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        
-        if humanoid then
-            -- Set state to Jumping to allow another jump in mid-air
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
