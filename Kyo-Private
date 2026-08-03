@@ -4055,8 +4055,6 @@ misc:AddButton("Fly GUI V3", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
 end)
 
-local InfiniteJumpEnabled = false
-
 -- 1. Switch to Enable/Disable
 misc:AddSwitch("Infinite Jump", function(Value)
     InfiniteJumpEnabled = Value
@@ -4108,248 +4106,85 @@ task.spawn(function()
     end
 end)
 
-local mainTab = Tab:AddFolder("Misc V3")
+local mainTab = Tab:AddFolder("Misc V2")
 
--- 2. Setup the full screen blackout overlay
-local ScreenGuiBlack = Instance.new("ScreenGui")
-ScreenGuiBlack.Name = "EleriumFullBlackout"
-ScreenGuiBlack.ResetOnSpawn = false
-ScreenGuiBlack.DisplayOrder = 9999999
-ScreenGuiBlack.IgnoreGuiInset = true
-ScreenGuiBlack.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local function mk(n, c)
+    local g = Instance.new("ScreenGui", game:GetService("Players").LocalPlayer.PlayerGui)
+    g.Name, g.ResetOnSpawn, g.DisplayOrder, g.IgnoreGuiInset = n, false, 9999999, true
+    local f = Instance.new("Frame", g)
+    f.Size, f.BackgroundColor3, f.BorderSizePixel, f.Visible = UDim2.new(1,0,1,0), c, 0, false
+    return f
+end
 
-local BlackFrame = Instance.new("Frame")
-BlackFrame.Name = "BlackoutFrame"
-BlackFrame.Size = UDim2.new(1, 0, 1, 0)
-BlackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-BlackFrame.BorderSizePixel = 0
-BlackFrame.Visible = false
-BlackFrame.Parent = ScreenGuiBlack
+local bF, wF = mk("B", Color3.new(0,0,0)), mk("W", Color3.new(1,1,1))
+mainTab:AddSwitch("Black Screen", function(s) bF.Visible = s end)
+mainTab:AddSwitch("White Screen", function(s) wF.Visible = s end)
 
--- 3. The Toggle Switch configuration
-mainTab:AddSwitch("Black Screen", function(state)
-    if state then
-        BlackFrame.Visible = true
-        print("Full Black Screen: ACTIVE")
-    else
-        BlackFrame.Visible = false
-        print("Full Black Screen: INACTIVE")
-    end
-end)
-
--- 2. Setup the full screen white flash/overlay container
-local ScreenGuiWhite = Instance.new("ScreenGui")
-ScreenGuiWhite.Name = "EleriumFullWhiteout"
-ScreenGuiWhite.ResetOnSpawn = false
-ScreenGuiWhite.DisplayOrder = 9999999
-ScreenGuiWhite.IgnoreGuiInset = true
-ScreenGuiWhite.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local WhiteFrame = Instance.new("Frame")
-WhiteFrame.Name = "WhiteoutFrame"
-WhiteFrame.Size = UDim2.new(1, 0, 1, 0)
-WhiteFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-WhiteFrame.BorderSizePixel = 0
-WhiteFrame.Visible = false
-WhiteFrame.Parent = ScreenGuiWhite
-
--- 3. The Toggle Switch configuration
-mainTab:AddSwitch("White Screen", function(state)
-    if state then
-        WhiteFrame.Visible = true
-        print("Full White Screen: ACTIVE")
-    else
-        WhiteFrame.Visible = false
-        print("Full White Screen: INACTIVE")
-    end
-end)
-
--- 2. State Toggle & Baseline Server Cache
-local fullbrightEnabled = false
-local Lighting = game:GetService("Lighting")
-
-local originalLighting = {
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    Shadows = Lighting.GlobalShadows
-}
-
--- Background loop to force fullbright
+local fb, orig = false, {game:GetService("Lighting").Ambient, game:GetService("Lighting").OutdoorAmbient, game:GetService("Lighting").Brightness, game:GetService("Lighting").ClockTime, game:GetService("Lighting").GlobalShadows}
 task.spawn(function()
     while task.wait(0.5) do
-        if fullbrightEnabled then
-            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-            Lighting.Brightness = 2
-            Lighting.ClockTime = 14
-            Lighting.GlobalShadows = false
-        end
+        if fb then game:GetService("Lighting").Ambient, game:GetService("Lighting").OutdoorAmbient, game:GetService("Lighting").Brightness, game:GetService("Lighting").ClockTime, game:GetService("Lighting").GlobalShadows = Color3.new(1,1,1), Color3.new(1,1,1), 2, 14, false end
     end
 end)
-
--- 3. The Fullbright UI Switch configuration
-mainTab:AddSwitch("Fullbright", function(state)
-    fullbrightEnabled = state
-    if not state then
-        Lighting.Ambient = originalLighting.Ambient
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-        Lighting.Brightness = originalLighting.Brightness
-        Lighting.ClockTime = originalLighting.ClockTime
-        Lighting.GlobalShadows = originalLighting.Shadows
-    end
+mainTab:AddSwitch("Fullbright", function(s)
+    fb = s
+    if not s then game:GetService("Lighting").Ambient, game:GetService("Lighting").OutdoorAmbient, game:GetService("Lighting").Brightness, game:GetService("Lighting").ClockTime, game:GetService("Lighting").GlobalShadows = unpack(orig) end
 end)
 
--- 2. State Toggles & Cache Arrays
-local boxEnabled = false
-local nameEnabled = false
-local healthEnabled = false
-local espCache = {}
+local be, ne, he, c = false, false, false, {}
 
-local function createESP(player)
-    if espCache[player] then return end
+local function esp(p)
+    if c[p] or p == game:GetService("Players").LocalPlayer then return end
+    local hl = Instance.new("Highlight")
+    hl.FillColor, hl.FillTransparency, hl.OutlineColor = Color3.new(1,0,0), 0.5, Color3.new(1,1,1)
     
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESPHighlight"
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineTransparency = 0
-    highlight.Enabled = false
-    
-    local nameBillboard = Instance.new("BillboardGui")
-    nameBillboard.Name = "ESPNameTag"
-    nameBillboard.Size = UDim2.new(0, 200, 0, 50)
-    nameBillboard.AlwaysOnTop = true 
-    nameBillboard.ExtentsOffset = Vector3.new(0, 3, 0) 
-    nameBillboard.Enabled = false
-    
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Text = player.DisplayName or player.Name
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textLabel.TextSize = 14
-    textLabel.Font = Enum.Font.SourceSansBold
-    textLabel.TextStrokeTransparency = 0 
-    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.Parent = nameBillboard
+    local nt = Instance.new("BillboardGui")
+    nt.Size, nt.AlwaysOnTop, nt.ExtentsOffset = UDim2.new(0,200,0,50), true, Vector3.new(0,3,0)
+    local tx = Instance.new("TextLabel", nt)
+    tx.Size, tx.BackgroundTransparency, tx.Text, tx.TextColor3, tx.TextSize, tx.Font, tx.TextStrokeTransparency = UDim2.new(1,0,1,0), 1, p.Name, Color3.new(1,1,1), 14, Enum.Font.SourceSansBold, 0
 
-    local healthBillboard = Instance.new("BillboardGui")
-    healthBillboard.Name = "ESPHealthBar"
-    healthBillboard.Size = UDim2.new(0, 5, 0, 45)
-    healthBillboard.AlwaysOnTop = true
-    healthBillboard.ExtentsOffset = Vector3.new(-2.2, 0.5, 0)
-    healthBillboard.Enabled = false
+    local hb = Instance.new("BillboardGui")
+    hb.Size, hb.AlwaysOnTop, hb.ExtentsOffset = UDim2.new(0,5,0,45), true, Vector3.new(-2.2,0.5,0)
+    local bg = Instance.new("Frame", hb)
+    bg.Size, bg.BackgroundColor3, bg.BorderSizePixel = UDim2.new(1,0,1,0), Color3.fromRGB(40,40,40), 0
+    local hm = Instance.new("Frame", bg)
+    hm.Size, hm.Position, hm.AnchorPoint, hm.BackgroundColor3, hm.BorderSizePixel = UDim2.new(1,0,1,0), UDim2.new(0,0,1,0), Vector2.new(0,1), Color3.fromRGB(0,255,0), 0
 
-    local healthBG = Instance.new("Frame")
-    healthBG.Size = UDim2.new(1, 0, 1, 0)
-    healthBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    healthBG.BorderSizePixel = 0
-    healthBG.Parent = healthBillboard
+    c[p] = {H = hl, N = nt, B = hb, M = hm}
 
-    local healthMain = Instance.new("Frame")
-    healthMain.Size = UDim2.new(1, 0, 1, 0)
-    healthMain.Position = UDim2.new(0, 0, 1, 0)
-    healthMain.AnchorPoint = Vector2.new(0, 1)
-    healthMain.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    healthMain.BorderSizePixel = 0
-    healthMain.Parent = healthBG
-
-    espCache[player] = {
-        Highlight = highlight, 
-        NameBillboard = nameBillboard,
-        HealthBillboard = healthBillboard,
-        HealthMain = healthMain,
-        Connection = nil
-    }
-    
-    local function applyESP()
-        local char = player.Character
-        local head = char and char:WaitForChild("Head", 5)
-        local humanoid = char and char:WaitForChild("Humanoid", 5)
-        
-        if char and head and humanoid then
-            highlight.Parent = char
-            
-            nameBillboard.Adornee = head
-            nameBillboard.Parent = head
-            
-            healthBillboard.Adornee = head
-            healthBillboard.Parent = head
-            
-            highlight.Enabled = boxEnabled
-            nameBillboard.Enabled = nameEnabled
-            healthBillboard.Enabled = healthEnabled
-
-            if espCache[player].Connection then espCache[player].Connection:Disconnect() end
-            
-            local function updateHealth()
-                local hp = humanoid.Health
-                local maxHp = humanoid.MaxHealth
-                local pct = math.clamp(hp / maxHp, 0, 1)
-                
-                healthMain.Size = UDim2.new(1, 0, pct, 0)
-                healthMain.BackgroundColor3 = Color3.fromHSV(pct * 0.35, 1, 1)
-            end
-            
-            espCache[player].Connection = humanoid:GetPropertyChangedSignal("Health"):Connect(updateHealth)
-            updateHealth()
+    local function up()
+        local ch = p.Character
+        local hd, hu = ch and ch:WaitForChild("Head", 5), ch and ch:WaitForChild("Humanoid", 5)
+        if ch and hd and hu then
+            hl.Parent, hl.Enabled = ch, be
+            nt.Adornee, nt.Parent, nt.Enabled = hd, hd, ne
+            hb.Adornee, hb.Parent, hb.Enabled = hd, hd, he
+            if c[p].Cn then c[p].Cn:Disconnect() end
+            c[p].Cn = hu:GetPropertyChangedSignal("Health"):Connect(function()
+                local pct = math.clamp(hu.Health / hu.MaxHealth, 0, 1)
+                hm.Size = UDim2.new(1, 0, pct, 0)
+                hm.BackgroundColor3 = Color3.fromHSV(pct * 0.35, 1, 1)
+            end)
         end
     end
-    
-    player.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        applyESP()
-    end)
-    
-    applyESP()
+    p.CharacterAdded:Connect(function() task.wait(0.5) up() end)
+    up()
 end
 
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then createESP(player) end
-end
-Players.PlayerAdded:Connect(createESP)
-
-Players.PlayerRemoving:Connect(function(player)
-    if espCache[player] then
-        if espCache[player].Highlight then espCache[player].Highlight:Destroy() end
-        if espCache[player].NameBillboard then espCache[player].NameBillboard:Destroy() end
-        if espCache[player].HealthBillboard then espCache[player].HealthBillboard:Destroy() end
-        if espCache[player].Connection then espCache[player].Connection:Disconnect() end
-        espCache[player] = nil
+for _, p in ipairs(game:GetService("Players"):GetPlayers()) do esp(p) end
+game:GetService("Players").PlayerAdded:Connect(esp)
+game:GetService("Players").PlayerRemoving:Connect(function(p)
+    if c[p] then
+        for _, v in pairs(c[p]) do if typeof(v) == "Instance" then v:Destroy() elseif typeof(v) == "RBXScriptConnection" then v:Disconnect() end end
+        c[p] = nil
     end
 end)
 
-mainTab:AddSwitch("Box ESP", function(state)
-    boxEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.Highlight then
-            assets.Highlight.Enabled = state
-        end
-    end
-end)
-
-mainTab:AddSwitch("Player Name ESP", function(state)
-    nameEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.NameBillboard then
-            assets.NameBillboard.Enabled = state
-        end
-    end
-end)
-
-mainTab:AddSwitch("Health Bar ESP", function(state)
-    healthEnabled = state
-    for player, assets in pairs(espCache) do
-        if player.Character and assets.HealthBillboard then
-            assets.HealthBillboard.Enabled = state
-        end
-    end
-end)
-
-local fps1 = Tab:AddFolder("Misc V2")
+mainTab:AddSwitch("Box ESP", function(s) be = s for _, d in pairs(c) do if d.H then d.H.Enabled = s end end end)
+mainTab:AddSwitch("Player Name ESP", function(s) ne = s for _, d in pairs(c) do if d.N then d.N.Enabled = s end end end)
+mainTab:AddSwitch("Health Bar ESP", function(s) he = s for _, d in pairs(c) do if d.B then d.B.Enabled = s end end end)
+	
+local fps1 = Tab:AddFolder("Misc V3")
 
 	fps1:AddButton('Remove Textures', function()
 		local v1194, v1195, v1196 = pairs(game:GetDescendants())
@@ -4647,8 +4482,8 @@ fps1:AddButton('Remove Fog', function()
 		})
 	end)
 
-game.StarterGui:SetCore("SendNotification", {
+game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Private~Script",
-    Text = "Script~Loaded!",
-    Duration = 5
+    Text = "Made By: Kyo",
+    Duration = 5,
 })
