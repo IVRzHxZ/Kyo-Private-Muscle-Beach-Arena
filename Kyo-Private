@@ -3945,7 +3945,10 @@ misc:AddButton("Jerk Tool (R15)", function()
     loadstring(game:HttpGet("https://pastefy.app/YZoglOyJ/raw"))()
 end)
 
-
+misc:AddButton("Fly GUI V3", function()
+    -- This executes the external Fly GUI script when the button is clicked
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+end)
 
 local ClickTPEnabled = false
 local Mouse = game.Players.LocalPlayer:GetMouse()
@@ -4048,11 +4051,6 @@ misc:AddSwitch("Noclip", function(state)
             end
         end
     end
-end)
-
-misc:AddButton("Fly GUI V3", function()
-    -- This executes the external Fly GUI script when the button is clicked
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
 end)
 
 -- 1. Switch to Enable/Disable
