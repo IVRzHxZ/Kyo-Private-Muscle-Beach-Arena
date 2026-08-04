@@ -1975,7 +1975,7 @@ do
 
     if _G.TrackerCore.SpyTab then
         for _, name in ipairs(_G.TrackerCore.Config.Stats) do
-            pcall(function() _G.TrackerCore.SpyState.labels[name] = _G.TrackerCore.SpyTab:AddLabel(name .. ": N/A (+0) | /M: 0 | /H: 0 | /D: 0 | /W: 0 | /MO: 0") end)
+            pcall(function() _G.TrackerCore.SpyState.labels[name] = _G.TrackerCore.SpyTab:AddLabel(name .. ": N/A (+0) | M: 0 | H: 0 | D: 0 | W: 0 | MO: 0") end)
         end
     end
 
@@ -2019,7 +2019,7 @@ do
                         if gained > 0 then
                             if r <= 0 then r = gained / math.max(currentTime - S.startTime, 1) end
                             _G.TrackerCore.Utils.updateLabelText(S.labels[name], string.format(
-                                "%s: %s (+%s) | /M: %s | /H: %s | /D: %s | /W: %s | /MO: %s",
+                                "%s: %s (+%s) | M: %s | H: %s | D: %s | W: %s | MO: %s",
                                 name, _G.TrackerCore.Utils.formatNumber(currentVal), _G.TrackerCore.Utils.formatNumber(gained),
                                 _G.TrackerCore.Utils.formatNumber(r * 60), 
                                 _G.TrackerCore.Utils.formatNumber(r * 3600), 
