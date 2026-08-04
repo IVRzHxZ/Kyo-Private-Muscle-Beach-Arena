@@ -2643,13 +2643,12 @@ local player = game.Players.LocalPlayer
 local whitelistFriendsActive = false 
 local TargetInput = ""         
 local WhitelistedPlayers = {}       -- Dictionary mapping UserId -> true
-local MultiInputText = ""           -- Stores the raw comma-separated text string
+local MultiInputText = ""          -- Stores the raw comma-separated text string
 
 -- Added Label Variable Support for Elerium V2 Whitelist Display
 local WhitelistDisplayLabel = nil
 
 -- Target Kill List Variables
-local TargetKillListText = ""       -- Stores the raw comma-separated target kill list string
 local TargetKillListActive = false  -- Toggle state for Loop TP Kill Target List
 local TargetKillPlayers = {}        -- Dictionary mapping UserId -> true for target kill list
 local SpyTargetKillListActive = false -- Toggle state for spying on the target kill list
@@ -2748,12 +2747,10 @@ end
 local function isWhitelisted(otherPlayer)
     if not otherPlayer then return false end
     
-    -- 1. Check if player's UserId exists inside our manual Whitelist Table
     if WhitelistedPlayers[otherPlayer.UserId] then
         return true
     end
     
-    -- 2. Check Friends List (Only if the toggle switch is turned ON)
     if whitelistFriendsActive then
         local success, result = pcall(function()
             return player:IsFriendsWith(otherPlayer.UserId)
@@ -2766,192 +2763,6 @@ end
 
 -- Create tab after vars are ready
 local Tab = window:AddTab("☠️ Auto Kill") -- Name of tab
-
-Tab:AddButton("Server Hop + Auto Kill", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/IVRzHxZ/Farming-Auto-KIll-in-xKyo/refs/heads/main/farmkillsxkyo"))()
-end)
-
--- ============================================================================
--- GLOBAL CONVERSION ARCHITECTURE & CONNECTION CLEANUP MEMORY
--- ============================================================================
-_G.TotalKills = 0
-_G.CurrentStreak = 0
-_G.KillsGained = 0
-
-local HeartbeatConnection = nil
-local RenderSteppedConnection = nil
-local TargetScreenGui = nil
-
-local _G_Players = game:GetService("Players")
-local MyLocalPlayer = _G_Players.LocalPlayer
-local _G_RunService = game:GetService("RunService")
-local _G_CoreGui = game:GetService("CoreGui")
-
--- Core Cleanup Function
-local function destroyKillTrackerUI()
-    if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
-    if RenderSteppedConnection then RenderSteppedConnection:Disconnect() RenderSteppedConnection = nil end
-    
-    if TargetScreenGui then
-        TargetScreenGui:Destroy()
-        TargetScreenGui = nil
-    elseif _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
-        _G_CoreGui.UniversalKillTrackerUI:Destroy()
-    end
-    
-    _G.TotalKills = 0
-    _G.CurrentStreak = 0
-    _G.KillsGained = 0
-end
-
-local function createKillTrackerUI()
-    if _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
-        _G_CoreGui.UniversalKillTrackerUI:Destroy()
-    end
-
-    TargetScreenGui = Instance.new("ScreenGui")
-    TargetScreenGui.Name = "UniversalKillTrackerUI"
-    TargetScreenGui.Parent = _G_CoreGui
-    TargetScreenGui.ResetOnSpawn = false
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 220, 0, 140)
-    MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.Draggable = true 
-    MainFrame.Parent = TargetScreenGui
-
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 8)
-    MainCorner.Parent = MainFrame
-
-    local FrameStroke = Instance.new("UIStroke")
-    FrameStroke.Thickness = 2
-    FrameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    FrameStroke.Parent = MainFrame
-
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Name = "TitleLabel"
-    TitleLabel.Size = UDim2.new(1, 0, 0, 28)
-    TitleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    TitleLabel.BorderSizePixel = 0
-    TitleLabel.Text = "          Kills Counter UI"
-    TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    TitleLabel.TextSize = 22
-    TitleLabel.Font = Enum.Font.SourceSansBold
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = MainFrame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 8)
-    TitleCorner.Parent = TitleLabel
-
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 24, 0, 24)
-    CloseButton.Position = UDim2.new(1, -26, 0, 2)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    CloseButton.BackgroundTransparency = 1 
-    CloseButton.Text = "X"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80) 
-    CloseButton.TextSize = 14
-    CloseButton.Font = Enum.Font.SourceSansBold
-    CloseButton.Parent = MainFrame
-
-    local KillCounterLabel = Instance.new("TextLabel")
-    KillCounterLabel.Name = "KillCounterLabel"
-    KillCounterLabel.Size = UDim2.new(1, 0, 0, 32)
-    KillCounterLabel.Position = UDim2.new(0, 0, 0, 32)
-    KillCounterLabel.BackgroundTransparency = 1
-    KillCounterLabel.Text = "Total Kills: 0"
-    KillCounterLabel.TextSize = 18
-    KillCounterLabel.Font = Enum.Font.SourceSansBold
-    KillCounterLabel.Parent = MainFrame
-
-    local StreakCounterLabel = Instance.new("TextLabel")
-    StreakCounterLabel.Name = "StreakCounterLabel"
-    StreakCounterLabel.Size = UDim2.new(1, 0, 0, 32)
-    StreakCounterLabel.Position = UDim2.new(0, 0, 0, 64)
-    StreakCounterLabel.BackgroundTransparency = 1
-    StreakCounterLabel.Text = "KillStreak: 0"
-    StreakCounterLabel.TextSize = 18
-    StreakCounterLabel.Font = Enum.Font.SourceSansBold
-    StreakCounterLabel.Parent = MainFrame
-
-    local GainedCounterLabel = Instance.new("TextLabel")
-    GainedCounterLabel.Name = "GainedCounterLabel"
-    GainedCounterLabel.Size = UDim2.new(1, 0, 0, 32)
-    GainedCounterLabel.Position = UDim2.new(0, 0, 0, 96)
-    GainedCounterLabel.BackgroundTransparency = 1
-    GainedCounterLabel.Text = "Kills Gained: 0"
-    GainedCounterLabel.TextSize = 18
-    GainedCounterLabel.Font = Enum.Font.SourceSansBold
-    GainedCounterLabel.Parent = MainFrame
-
-    local initialKillsSet = false
-    local lastKillsValue = 0
-
-    HeartbeatConnection = _G_RunService.Heartbeat:Connect(function()
-        pcall(function()
-            local leaderstats = MyLocalPlayer:FindFirstChild("leaderstats")
-            if leaderstats then
-                local killsObj = leaderstats:FindFirstChild("Kills") or leaderstats:FindFirstChild("kills")
-                if killsObj and killsObj:IsA("ValueBase") then
-                    _G.TotalKills = killsObj.Value or 0
-                    KillCounterLabel.Text = "Total Kills: " .. tostring(_G.TotalKills)
-                    
-                    if not initialKillsSet then
-                        lastKillsValue = _G.TotalKills
-                        initialKillsSet = true
-                    end
-                    
-                    if _G.TotalKills > lastKillsValue then
-                        local difference = _G.TotalKills - lastKillsValue
-                        _G.KillsGained = _G.KillsGained + difference
-                        lastKillsValue = _G.TotalKills
-                    elseif _G.TotalKills < lastKillsValue then
-                        lastKillsValue = _G.TotalKills
-                    end
-                    
-                    GainedCounterLabel.Text = "Kills Gained: " .. tostring(_G.KillsGained)
-                end
-                
-                local streakObj = leaderstats:FindFirstChild("KillStreak") or leaderstats:FindFirstChild("Killstreak") or leaderstats:FindFirstChild("Streak") or leaderstats:FindFirstChild("streak")
-                if streakObj and streakObj:IsA("ValueBase") then
-                    _G.CurrentStreak = streakObj.Value or 0
-                    StreakCounterLabel.Text = "KillStreak: " .. tostring(_G.CurrentStreak)
-                end
-            end
-        end)
-    end)
-
-    RenderSteppedConnection = _G_RunService.RenderStepped:Connect(function()
-        local speedMultiplier = 3 
-        local gameTime = os.clock() * speedMultiplier
-        
-        local r = math.sin(gameTime + 0) * 127 + 128
-        local g = math.sin(gameTime + 2) * 127 + 128
-        local b = math.sin(gameTime + 4) * 127 + 128
-        
-        local rainbowColor = Color3.fromRGB(r, g, b)
-        
-        FrameStroke.Color = rainbowColor
-        KillCounterLabel.TextColor3 = rainbowColor
-        StreakCounterLabel.TextColor3 = rainbowColor
-        GainedCounterLabel.TextColor3 = rainbowColor
-    end)
-
-    CloseButton.MouseButton1Click:Connect(function()
-        destroyKillTrackerUI()
-    end)
-end
-
-Tab:AddButton("Kills Counter UI", function()
-    createKillTrackerUI()
-end)
 
 -- [[ UI Elements Setup ]]
 
@@ -3035,7 +2846,7 @@ Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
                         
                         if targetPlayer ~= player and targetPlayer.Character and not isWhitelisted(targetPlayer) then
                             local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            local tHumanoid = targetPlayer.Character:FindFirstChild("Humanoid")
                             
                             if tRoot and tHumanoid and tHumanoid.Health > 0 then
                                 for _ = 1, 3 do
@@ -3076,12 +2887,30 @@ Tab:AddSwitch("Loop TP Auto Kill All V2", function(Value)
     end
 end)
 
-Tab:AddTextBox("Target Player Name / Nickname", function(text)
+-- [[ SINGLE TARGET DROPDOWN ]]
+local singleTargetDropdown = Tab:AddDropdown("Target Player", function(text)
     TargetInput = text
-end, {
-    ["placeholder"] = "Enter Username or Nickname...",
-    ["clear"] = false
-})
+end)
+
+-- Function to refresh options for dropdowns dynamically
+local function RefreshDropdowns()
+    pcall(function()
+        for _, p in ipairs(game.Players:GetPlayers()) do
+            if p ~= player then
+                singleTargetDropdown:Add(p.Name)
+            end
+        end
+    end)
+end
+
+RefreshDropdowns()
+
+game.Players.PlayerAdded:Connect(function(p)
+    task.wait(1)
+    if p ~= player then
+        singleTargetDropdown:Add(p.Name)
+    end
+end)
 
 Tab:AddSwitch("TP Kill Target", function(state)
     LoopKilling = state
@@ -3146,34 +2975,30 @@ Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 -- Kill List UI Label Display (Elerium V2)
 KillListDisplayLabel = Tab:AddLabel("Kill List: (Empty)")
 
-Tab:AddTextBox("Type Names To Kill List", function(text)
-    TargetKillListText = text
-end, {
-    ["placeholder"] = "e.g. user1, user2, user3",
-    ["clear"] = false
-})
+local targetKillDropdown = Tab:AddDropdown("Add To Target Kill List", function(text)
+    local target = GetPlayerByInput(text)
+    if target then
+        TargetKillPlayers[target.UserId] = true
+        print("[TARGET KILL LIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
+        UpdateKillListLabel()
+    end
+end)
 
-Tab:AddButton("Add To Target Kill List", function()
-    if TargetKillListText == "" then 
-        print("[TARGET KILL LIST] Text box is empty!")
-        return 
+-- Keep target kill dropdown updated with players
+task.spawn(function()
+    while true do
+        task.wait(3)
+        pcall(function()
+            for _, p in ipairs(game.Players:GetPlayers()) do
+                if p ~= player then
+                    targetKillDropdown:Add(p.Name)
+                end
+            end
+        end)
     end
-    
-    for nameSegment in string.gmatch(TargetKillListText, "([^,]+)") do
-        local target = GetPlayerByInput(nameSegment)
-        if target then
-            TargetKillPlayers[target.UserId] = true
-            print("[TARGET KILL LIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
-        else
-            local cleanName = nameSegment:match("^%s*(.-)%s*$")
-            print("[TARGET KILL LIST] Could not find player: '" .. cleanName .. "'")
-        end
-    end
-    UpdateKillListLabel()
 end)
 
 Tab:AddButton("Clear All Target Kill List", function()
-    TargetKillListText = ""
     TargetKillPlayers = {}
     print("[TARGET KILL LIST] Target Kill List cleared completely.")
     UpdateKillListLabel()
@@ -3198,7 +3023,7 @@ Tab:AddSwitch("TP Kill Target List", function(Value)
                         
                         if targetPlayer and targetPlayer ~= player and targetPlayer.Character and not isWhitelisted(targetPlayer) then
                             local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            local tHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            local tHumanoid = targetPlayer.Character:FindFirstChild("Humanoid")
                             local timeSpent = 0
                             
                             while TargetKillListActive and tRoot and tHumanoid and tHumanoid.Health > 0 and targetPlayer.Parent == game.Players and timeSpent < 0.5 do
@@ -3422,16 +3247,17 @@ _G.autokillall, _G.autokillall2, _G.autokilltarget, _G.autokilltargetlist = fals
 _G.SingleTargetName, _G.FriendsWhitelistActive, _G.SpectateTargetActive, _G.SpectateTargetListActive = "", false, false, false
 _G.whitelistTable, _G.targetKillListTable, _G.friendsCache, _G.activeThreads = {}, {}, {}, {} 
 _G.whitelistInputTextCache = "" 
-_G.targetKillInputTextCache = ""
 
 _G.PlayersService = game:GetService("Players")
 _G.RunService = game:GetService("RunService")
 _G.MyLocalPlayer = _G.PlayersService.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Global reference variables for Elerium V2 display labels
+-- Global reference variables for Elerium V2 display labels and dropdowns
 local KillListDisplayLabel = nil
 local WhitelistDisplayLabel = nil
+local targetKillDropdown = nil
+local singleTargetDropdown = nil
 
 -- ============================================================================
 -- BACKGROUND ASYNC FRIENDS CACHING FRAMEWORK
@@ -3453,6 +3279,17 @@ _G.PlayersService.PlayerAdded:Connect(function(player)
         local success, isFriend = pcall(function() return _G.MyLocalPlayer:IsFriendsWithAsync(player.UserId) end)
         if success and isFriend then _G.friendsCache[player.UserId] = true end
     end
+    task.wait(1)
+    pcall(function()
+        if player ~= _G.MyLocalPlayer then
+            if singleTargetDropdown and singleTargetDropdown.Add then
+                singleTargetDropdown:Add(player.Name)
+            end
+            if targetKillDropdown and targetKillDropdown.Add then
+                targetKillDropdown:Add(player.Name)
+            end
+        end
+    end)
 end)
 
 _G.PlayersService.PlayerRemoving:Connect(function(player)
@@ -3737,9 +3574,9 @@ end)
 Tab:AddSwitch("Auto Kill All", function(state) _G.autokillall = state end)
 Tab:AddSwitch("Auto Kill All V2", function(state) _G.autokillall2 = state; if not state then table.clear(_G.activeThreads) end end)
 
-Tab:AddTextBox("Target Player Auto Kill Target", function(text)
+singleTargetDropdown = Tab:AddDropdown("Target Player Auto Kill Target", function(text)
     _G.SingleTargetName = text
-end, {["clear"] = false})
+end)
 
 Tab:AddSwitch("Auto Kill Target", function(state) _G.autokilltarget = state end)
 
@@ -3755,13 +3592,9 @@ Tab:AddLabel("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 -- Kill List Display Label setup for Elerium V2
 KillListDisplayLabel = Tab:AddLabel("Kill List: (Empty)")
 
-Tab:AddTextBox("Target Player Kill List", function(text)
-    _G.targetKillInputTextCache = text
-end, {["clear"] = false})
-
-Tab:AddButton("Add To Target Kill List", function()
-    if _G.targetKillInputTextCache and _G.targetKillInputTextCache ~= "" then
-        local searchInput = _G.targetKillInputTextCache:lower():gsub("%s+", "")
+targetKillDropdown = Tab:AddDropdown("Add To Target Kill List", function(text)
+    if text and text ~= "" then
+        local searchInput = text:lower():gsub("%s+", "")
         local playerFound = false
         
         for _, player in ipairs(_G.PlayersService:GetPlayers()) do
@@ -3790,7 +3623,7 @@ Tab:AddButton("Add To Target Kill List", function()
         end
         UpdateKillListLabelText()
     else
-        print("Error: Target Kill TextBox is empty! Type a name first.")
+        print("Error: Target Kill Dropdown selection is empty!")
     end
 end)
 
@@ -3859,6 +3692,23 @@ Tab:AddButton("Clear All Whitelist", function()
     table.clear(_G.whitelistTable)
     print("Whitelist cleared completely.")
     UpdateWhitelistLabelText()
+end)
+
+-- Populate options into dropdowns for current online players
+task.spawn(function()
+    task.wait(1)
+    pcall(function()
+        for _, player in ipairs(_G.PlayersService:GetPlayers()) do
+            if player ~= _G.MyLocalPlayer then
+                if singleTargetDropdown and singleTargetDropdown.Add then
+                    singleTargetDropdown:Add(player.Name)
+                end
+                if targetKillDropdown and targetKillDropdown.Add then
+                    targetKillDropdown:Add(player.Name)
+                end
+            end
+        end
+    end)
 end)
 
 local Tab = window:AddTab("⚙️ Misc") -- Name of tab
