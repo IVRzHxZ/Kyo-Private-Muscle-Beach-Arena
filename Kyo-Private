@@ -2642,7 +2642,7 @@ end
 local player = game.Players.LocalPlayer
 local whitelistFriendsActive = false 
 local TargetInput = ""         
-local WhitelistedPlayers = {}       -- Dictionary mapping UserId -> true
+local WhitelistedPlayers = {}        -- Dictionary mapping UserId -> true
 local MultiInputText = ""          -- Stores the raw comma-separated text string
 
 -- Added Label Variable Support for Elerium V2 Whitelist Display
@@ -2892,12 +2892,12 @@ local singleTargetDropdown = Tab:AddDropdown("Target Player", function(text)
     TargetInput = text
 end)
 
--- Function to refresh options for dropdowns dynamically
+-- Function to refresh options for dropdowns dynamically (Display Name only)
 local function RefreshDropdowns()
     pcall(function()
         for _, p in ipairs(game.Players:GetPlayers()) do
             if p ~= player then
-                singleTargetDropdown:Add(p.Name)
+                singleTargetDropdown:Add(p.DisplayName)
             end
         end
     end)
@@ -2908,7 +2908,7 @@ RefreshDropdowns()
 game.Players.PlayerAdded:Connect(function(p)
     task.wait(1)
     if p ~= player then
-        singleTargetDropdown:Add(p.Name)
+        singleTargetDropdown:Add(p.DisplayName)
     end
 end)
 
@@ -2984,14 +2984,14 @@ local targetKillDropdown = Tab:AddDropdown("Add To Target Kill List", function(t
     end
 end)
 
--- Keep target kill dropdown updated with players
+-- Keep target kill dropdown updated with players (Display Name only)
 task.spawn(function()
     while true do
         task.wait(3)
         pcall(function()
             for _, p in ipairs(game.Players:GetPlayers()) do
                 if p ~= player then
-                    targetKillDropdown:Add(p.Name)
+                    targetKillDropdown:Add(p.DisplayName)
                 end
             end
         end)
@@ -3223,10 +3223,10 @@ Tab:AddButton("Add Whitelist Players", function()
         local target = GetPlayerByInput(nameSegment)
         if target then
             WhitelistedPlayers[target.UserId] = true
-            print("[WHITELIST] Added: " .. target.Name .. " (" .. target.DisplayName .. ")")
+            print("[WHITELIST] Added: " + target.Name + " (" + target.DisplayName + ")")
         else
             local cleanName = nameSegment:match("^%s*(.-)%s*$")
-            print("[WHITELIST] Could not find player: '" .. cleanName .. "'")
+            print("[WHITELIST] Could not find player: '" + cleanName + "'")
         end
     end
     UpdateWhitelistLabel()
@@ -3238,7 +3238,7 @@ Tab:AddButton("Clear All Whitelist", function()
     UpdateWhitelistLabel()
 end)
 
-Tab:AddLabel("Auto Kill V2")
+Tab:AddLabel("~~~Auto Kill V2~~~")
 
 -- ============================================================================
 -- GLOBAL STATE & SERVICES
@@ -3283,10 +3283,10 @@ _G.PlayersService.PlayerAdded:Connect(function(player)
     pcall(function()
         if player ~= _G.MyLocalPlayer then
             if singleTargetDropdown and singleTargetDropdown.Add then
-                singleTargetDropdown:Add(player.Name)
+                singleTargetDropdown:Add(player.DisplayName)
             end
             if targetKillDropdown and targetKillDropdown.Add then
-                targetKillDropdown:Add(player.Name)
+                targetKillDropdown:Add(player.DisplayName)
             end
         end
     end)
@@ -3694,17 +3694,17 @@ Tab:AddButton("Clear All Whitelist", function()
     UpdateWhitelistLabelText()
 end)
 
--- Populate options into dropdowns for current online players
+-- Populate options into dropdowns for current online players (Display Name only)
 task.spawn(function()
     task.wait(1)
     pcall(function()
         for _, player in ipairs(_G.PlayersService:GetPlayers()) do
             if player ~= _G.MyLocalPlayer then
                 if singleTargetDropdown and singleTargetDropdown.Add then
-                    singleTargetDropdown:Add(player.Name)
+                    singleTargetDropdown:Add(player.DisplayName)
                 end
                 if targetKillDropdown and targetKillDropdown.Add then
-                    targetKillDropdown:Add(player.Name)
+                    targetKillDropdown:Add(player.DisplayName)
                 end
             end
         end
