@@ -2764,6 +2764,192 @@ end
 -- Create tab after vars are ready
 local Tab = window:AddTab("☠️ Auto Kill") -- Name of tab
 
+Tab:AddButton("Server Hop + Auto Kill", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/IVRzHxZ/Farming-Auto-KIll-in-xKyo/refs/heads/main/farmkillsxkyo"))()
+end)
+
+-- ============================================================================
+-- GLOBAL CONVERSION ARCHITECTURE & CONNECTION CLEANUP MEMORY
+-- ============================================================================
+_G.TotalKills = 0
+_G.CurrentStreak = 0
+_G.KillsGained = 0
+
+local HeartbeatConnection = nil
+local RenderSteppedConnection = nil
+local TargetScreenGui = nil
+
+local _G_Players = game:GetService("Players")
+local MyLocalPlayer = _G_Players.LocalPlayer
+local _G_RunService = game:GetService("RunService")
+local _G_CoreGui = game:GetService("CoreGui")
+
+-- Core Cleanup Function
+local function destroyKillTrackerUI()
+    if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
+    if RenderSteppedConnection then RenderSteppedConnection:Disconnect() RenderSteppedConnection = nil end
+    
+    if TargetScreenGui then
+        TargetScreenGui:Destroy()
+        TargetScreenGui = nil
+    elseif _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
+        _G_CoreGui.UniversalKillTrackerUI:Destroy()
+    end
+    
+    _G.TotalKills = 0
+    _G.CurrentStreak = 0
+    _G.KillsGained = 0
+end
+
+local function createKillTrackerUI()
+    if _G_CoreGui:FindFirstChild("UniversalKillTrackerUI") then
+        _G_CoreGui.UniversalKillTrackerUI:Destroy()
+    end
+
+    TargetScreenGui = Instance.new("ScreenGui")
+    TargetScreenGui.Name = "UniversalKillTrackerUI"
+    TargetScreenGui.Parent = _G_CoreGui
+    TargetScreenGui.ResetOnSpawn = false
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 220, 0, 140)
+    MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true 
+    MainFrame.Parent = TargetScreenGui
+
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 8)
+    MainCorner.Parent = MainFrame
+
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Thickness = 2
+    FrameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    FrameStroke.Parent = MainFrame
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "TitleLabel"
+    TitleLabel.Size = UDim2.new(1, 0, 0, 28)
+    TitleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    TitleLabel.BorderSizePixel = 0
+    TitleLabel.Text = "          Kills Counter UI"
+    TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    TitleLabel.TextSize = 22
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 8)
+    TitleCorner.Parent = TitleLabel
+
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 24, 0, 24)
+    CloseButton.Position = UDim2.new(1, -26, 0, 2)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    CloseButton.BackgroundTransparency = 1 
+    CloseButton.Text = "X"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80) 
+    CloseButton.TextSize = 14
+    CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.Parent = MainFrame
+
+    local KillCounterLabel = Instance.new("TextLabel")
+    KillCounterLabel.Name = "KillCounterLabel"
+    KillCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    KillCounterLabel.Position = UDim2.new(0, 0, 0, 32)
+    KillCounterLabel.BackgroundTransparency = 1
+    KillCounterLabel.Text = "Total Kills: 0"
+    KillCounterLabel.TextSize = 18
+    KillCounterLabel.Font = Enum.Font.SourceSansBold
+    KillCounterLabel.Parent = MainFrame
+
+    local StreakCounterLabel = Instance.new("TextLabel")
+    StreakCounterLabel.Name = "StreakCounterLabel"
+    StreakCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    StreakCounterLabel.Position = UDim2.new(0, 0, 0, 64)
+    StreakCounterLabel.BackgroundTransparency = 1
+    StreakCounterLabel.Text = "KillStreak: 0"
+    StreakCounterLabel.TextSize = 18
+    StreakCounterLabel.Font = Enum.Font.SourceSansBold
+    StreakCounterLabel.Parent = MainFrame
+
+    local GainedCounterLabel = Instance.new("TextLabel")
+    GainedCounterLabel.Name = "GainedCounterLabel"
+    GainedCounterLabel.Size = UDim2.new(1, 0, 0, 32)
+    GainedCounterLabel.Position = UDim2.new(0, 0, 0, 96)
+    GainedCounterLabel.BackgroundTransparency = 1
+    GainedCounterLabel.Text = "Kills Gained: 0"
+    GainedCounterLabel.TextSize = 18
+    GainedCounterLabel.Font = Enum.Font.SourceSansBold
+    GainedCounterLabel.Parent = MainFrame
+
+    local initialKillsSet = false
+    local lastKillsValue = 0
+
+    HeartbeatConnection = _G_RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local leaderstats = MyLocalPlayer:FindFirstChild("leaderstats")
+            if leaderstats then
+                local killsObj = leaderstats:FindFirstChild("Kills") or leaderstats:FindFirstChild("kills")
+                if killsObj and killsObj:IsA("ValueBase") then
+                    _G.TotalKills = killsObj.Value or 0
+                    KillCounterLabel.Text = "Total Kills: " .. tostring(_G.TotalKills)
+                    
+                    if not initialKillsSet then
+                        lastKillsValue = _G.TotalKills
+                        initialKillsSet = true
+                    end
+                    
+                    if _G.TotalKills > lastKillsValue then
+                        local difference = _G.TotalKills - lastKillsValue
+                        _G.KillsGained = _G.KillsGained + difference
+                        lastKillsValue = _G.TotalKills
+                    elseif _G.TotalKills < lastKillsValue then
+                        lastKillsValue = _G.TotalKills
+                    end
+                    
+                    GainedCounterLabel.Text = "Kills Gained: " .. tostring(_G.KillsGained)
+                end
+                
+                local streakObj = leaderstats:FindFirstChild("KillStreak") or leaderstats:FindFirstChild("Killstreak") or leaderstats:FindFirstChild("Streak") or leaderstats:FindFirstChild("streak")
+                if streakObj and streakObj:IsA("ValueBase") then
+                    _G.CurrentStreak = streakObj.Value or 0
+                    StreakCounterLabel.Text = "KillStreak: " .. tostring(_G.CurrentStreak)
+                end
+            end
+        end)
+    end)
+
+    RenderSteppedConnection = _G_RunService.RenderStepped:Connect(function()
+        local speedMultiplier = 3 
+        local gameTime = os.clock() * speedMultiplier
+        
+        local r = math.sin(gameTime + 0) * 127 + 128
+        local g = math.sin(gameTime + 2) * 127 + 128
+        local b = math.sin(gameTime + 4) * 127 + 128
+        
+        local rainbowColor = Color3.fromRGB(r, g, b)
+        
+        FrameStroke.Color = rainbowColor
+        KillCounterLabel.TextColor3 = rainbowColor
+        StreakCounterLabel.TextColor3 = rainbowColor
+        GainedCounterLabel.TextColor3 = rainbowColor
+    end)
+
+    CloseButton.MouseButton1Click:Connect(function()
+        destroyKillTrackerUI()
+    end)
+end
+
+Tab:AddButton("Kills Counter UI", function()
+    createKillTrackerUI()
+end)
+
 -- [[ UI Elements Setup ]]
 
 Tab:AddSwitch("Loop TP Auto Kill All", function(Value)
